@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opole Network Map - Projekty</title>
+    <meta name="description" content="Lista projektów sieciowych – Opole Network Map">
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+</head>
+<body class="dashboard-bg">
+    <nav class="navbar glass-panel">
+        <div class="nav-brand">Opole Network Map</div>
+        <div class="nav-user">
+            <span id="user-greeting">Witaj, Użytkowniku</span>
+            <span id="role-badge" class="role-badge hidden"></span>
+            <button id="logout-btn" class="btn-secondary btn-sm">Wyloguj</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="header-action">
+            <h2>Twoje Projekty</h2>
+            <button id="new-project-btn" class="btn-primary">+ Nowy Projekt</button>
+        </div>
+
+        <div id="new-project-form" class="glass-panel hidden mb-4">
+            <h3>Utwórz nowy projekt</h3>
+            <div class="form-group row">
+                <input type="text" id="project-name" placeholder="Nazwa projektu" class="flex-grow">
+                <button id="save-project-btn" class="btn-success">Zapisz</button>
+                <button id="cancel-project-btn" class="btn-secondary">Anuluj</button>
+            </div>
+        </div>
+
+        <div class="projects-grid" id="projects-container">
+            <div class="loading">Ładowanie projektów...</div>
+        </div>
+    </div>
+
+    <!-- Dialog potwierdzenia usunięcia -->
+    <div id="delete-project-modal" class="modal-overlay hidden">
+        <div class="modal-box glass-panel">
+            <h3>Usuń projekt</h3>
+            <p id="delete-project-msg">Czy na pewno chcesz usunąć ten projekt? Tej operacji nie można cofnąć.</p>
+            <div class="modal-actions">
+                <button id="confirm-delete-project" class="btn-danger-modal">Usuń</button>
+                <button id="cancel-delete-project" class="btn-secondary btn-sm">Anuluj</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        const username = localStorage.getItem('username');
+        const role     = localStorage.getItem('role');
+        const isAdmin  = role === 'ADMIN';
+
+        if (!username) {
+            window.location.href = 'index.html';
+        } else {
+            document.getElementById('user-greeting').textContent = 'Witaj, ' + username;
+
+            if (isAdmin) {
+                const badge = document.getElementById('role-badge');
+                badge.textContent = 'Admin';
+                badge.classList.remove('hidden');
+            }
+
+            loadProjects();
+        }
+    </script>
+</body>
+</html>

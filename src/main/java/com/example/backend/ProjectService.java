@@ -1,66 +1,57 @@
 package com.example.backend;
 
 import com.example.model.Project;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
+import com.example.repository.ProjectRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Optional;
+
+@Service
 public class ProjectService {
 
-    public static List<Project> getProjects() {
-        List<Project> projects = new ArrayList<>();
-        // Zmiana 'name' na 'title'
-        String query = "SELECT id, title FROM projects ORDER BY created_at DESC";
+    private final ProjectRepository projectRepository;
 
-        try (Connection conn = DatabaseConnector.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query);
-             ResultSet rs = stmt.executeQuery()) {
-
-            while (rs.next()) {
-                int id = rs.getInt("id");
-                String name = rs.getString("title"); // Pobieramy wartość z kolumny title
-                projects.add(new Project(id, name));
-            }
-        } catch (SQLException e) {
-            System.err.println("Błąd podczas pobierania projektów: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        return projects;
+    @Autowired
+    public ProjectService(ProjectRepository projectRepository) {
+        this.projectRepository = projectRepository;
     }
 
-    public static Project createProject(String name) {
-        int defaultUserId = 1;
-        return createProject(name, defaultUserId);
+    public List<Project> getProjects() {
+        return projectRepository.findAll();
     }
 
-    public static Project createProject(String name, int userId) {
-        if (name == null || name.trim().isEmpty()) return null;
+    public Optional<Project> getProjectById(Long id) {
+        return projectRepository.findById(id);
+    }
 
-        // Zmiana kolumny 'name' na 'title'
-        String query = "INSERT INTO projects (title, user_id) VALUES (?, ?) RETURNING id";
-
-        try (Connection conn = DatabaseConnector.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
-
-            stmt.setString(1, name.trim());
-            stmt.setInt(2, userId);
-
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                int generatedId = rs.getInt("id");
-                System.out.println("Utworzono projekt w Supabase o ID: " + generatedId);
-                return new Project(generatedId, name.trim());
-            }
-
-        } catch (SQLException e) {
-            System.err.println("Błąd podczas zapisywania projektu: " + e.getMessage());
-            e.printStackTrace();
+    public Project createProject(String name, Integer userId) {
+        if (name == null || name.trim().isEmpty()) {
+            return null;
         }
 
-        return null;
+        Project project = new Project(null, name.trim(), userId);
+        return projectRepository.save(project);
+    }
+
+    public Project updateProject(Long id, String name, Integer userId) {
+        return projectRepository.findById(id).map(project -> {
+            if (name != null && !name.trim().isEmpty()) {
+                project.setName(name.trim());
+            }
+            if (userId != null) {
+                project.setUserId(userId);
+            }
+            return projectRepository.save(project);
+        }).orElse(null);
+    }
+
+    public boolean deleteProject(Long id) {
+        if (projectRepository.existsById(id)) {
+            projectRepository.deleteById(id);
+            return true;
+        }
+        return false;
     }
 }

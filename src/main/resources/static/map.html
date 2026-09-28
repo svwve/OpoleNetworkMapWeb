@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opole Network Map - Mapa</title>
+    <meta name="description" content="Interaktywna mapa sieci kamer i światłowodów dla projektu Opole Network Map">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/map.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body class="map-body">
+
+    <!-- Topbar -->
+    <header class="map-topbar glass-panel">
+        <div class="topbar-left">
+            <button id="sidebar-toggle" class="icon-btn" title="Panel boczny">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <span class="nav-brand">Opole Network Map</span>
+            <span class="project-badge" id="project-name-display"></span>
+        </div>
+        <div class="topbar-right">
+            <span class="user-chip" id="user-chip"></span>
+            <button id="back-to-projects" class="btn-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left"></i> Projekty
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="map-layout">
+
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar glass-panel">
+            <nav class="sidebar-nav">
+                <button class="tab-btn active" data-tab="cameras-tab">
+                    <i class="fa-solid fa-camera"></i> Kamery
+                </button>
+                <button class="tab-btn" data-tab="fibers-tab">
+                    <i class="fa-solid fa-network-wired"></i> Światłowody
+                </button>
+            </nav>
+
+            <!-- Cameras Tab -->
+            <div id="cameras-tab" class="tab-panel active">
+                <div class="panel-header">
+                    <span class="panel-title">Kamery</span>
+                    <div class="panel-actions">
+                        <button id="show-all-cameras" class="icon-btn" title="Pokaż wszystkie">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                        <button id="hide-all-cameras" class="icon-btn" title="Ukryj wszystkie">
+                            <i class="fa-solid fa-eye-slash"></i>
+                        </button>
+                    </div>
+                </div>
+                <button id="btn-add-camera" class="tool-btn admin-only hidden">
+                    <i class="fa-solid fa-plus"></i> Dodaj kamerę
+                </button>
+                <div id="cameras-list" class="element-list"></div>
+            </div>
+
+            <!-- Fibers Tab -->
+            <div id="fibers-tab" class="tab-panel">
+                <div class="panel-header">
+                    <span class="panel-title">Światłowody</span>
+                    <div class="panel-actions">
+                        <button id="show-all-fibers" class="icon-btn" title="Pokaż wszystkie">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                        <button id="hide-all-fibers" class="icon-btn" title="Ukryj wszystkie">
+                            <i class="fa-solid fa-eye-slash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="admin-only hidden" id="fiber-tools">
+                    <button id="btn-add-fiber" class="tool-btn">
+                        <i class="fa-solid fa-draw-polygon"></i> Rysuj nowy
+                    </button>
+                    <button id="btn-append-fiber" class="tool-btn btn-outline">
+                        <i class="fa-solid fa-code-branch"></i> Dorysuj trasę
+                    </button>
+                    <button id="btn-edit-fiber" class="tool-btn btn-outline">
+                        <i class="fa-solid fa-pen"></i> Edytuj parametry
+                    </button>
+                    <button id="btn-vertex-delete" class="tool-btn btn-outline btn-danger-outline">
+                        <i class="fa-solid fa-circle-minus"></i> Usuń wierzchołek
+                    </button>
+                    <button id="btn-undo-fiber" class="tool-btn btn-outline">
+                        <i class="fa-solid fa-rotate-left"></i> Cofnij
+                    </button>
+                    <div id="fiber-draw-controls" class="fiber-draw-controls hidden">
+                        <p id="fiber-draw-instructions" class="fiber-draw-instructions"></p>
+                        <span id="fiber-draw-point-count" class="fiber-draw-point-count"></span>
+                        <label id="fiber-draw-name-label" class="fiber-draw-name-label hidden" for="fiber-draw-name">
+                            Nazwa światłowodu
+                            <input id="fiber-draw-name" type="text" maxlength="255" placeholder="Np. Magistrala północna">
+                        </label>
+                        <button id="btn-finish-fiber-drawing" class="tool-btn fiber-finish-btn" type="button">
+                            <i class="fa-solid fa-check"></i> Zakończ i zapisz
+                        </button>
+                        <button id="btn-cancel-fiber-drawing" class="tool-btn btn-outline" type="button">
+                            <i class="fa-solid fa-xmark"></i> Anuluj
+                        </button>
+                    </div>
+                </div>
+                <div id="fibers-list" class="element-list"></div>
+            </div>
+        </aside>
+
+        <!-- Map -->
+        <div id="map"></div>
+    </div>
+
+    <!-- Status bar -->
+    <div id="status-bar" class="status-bar hidden"></div>
+
+    <!-- Camera Dialog -->
+    <div id="camera-dialog" class="dialog-overlay hidden">
+        <div class="dialog glass-panel">
+            <div class="dialog-header">
+                <h2 id="camera-dialog-title">Szczegóły kamery</h2>
+                <button class="icon-btn dialog-close" id="close-camera-dialog">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="dialog-body">
+                <div class="form-group">
+                    <label for="cam-name">Nazwa</label>
+                    <input type="text" id="cam-name" required maxlength="255" placeholder="Nazwa kamery">
+                </div>
+                <div class="form-group">
+                    <label for="cam-desc">Opis</label>
+                    <textarea id="cam-desc" rows="3" maxlength="2000" placeholder="Opis / lokalizacja..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Zdjęcie</label>
+                    <div class="photo-area">
+                        <img id="cam-photo-preview" class="photo-preview hidden" alt="Podgląd zdjęcia kamery">
+                        <div id="cam-photo-placeholder" class="photo-placeholder">
+                            <i class="fa-solid fa-image" style="font-size:1.5rem;margin-bottom:6px;"></i><br>Brak zdjęcia
+                        </div>
+                        <div class="photo-buttons">
+                            <label for="cam-photo-input" class="btn-secondary btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                                <i class="fa-solid fa-upload"></i> Wybierz plik
+                            </label>
+                            <input type="file" id="cam-photo-input" accept="image/png,image/jpeg,image/webp" class="hidden">
+                            <button id="cam-photo-clear" class="btn-sm btn-danger-outline">
+                                <i class="fa-solid fa-xmark"></i> Usuń
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group coord-display">
+                    <i class="fa-solid fa-location-dot"></i>
+                    Lat: <strong id="cam-lat-display">—</strong> | Lng: <strong id="cam-lng-display">—</strong>
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button id="cam-save-btn" class="btn-primary">
+                    <i class="fa-solid fa-floppy-disk"></i> Zapisz
+                </button>
+                <button id="cam-delete-btn" class="btn-danger admin-only hidden">
+                    <i class="fa-solid fa-trash"></i> Usuń kamerę
+                </button>
+                <button id="close-camera-dialog-2" class="btn-secondary">
+                    <i class="fa-solid fa-ban"></i> Anuluj
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fiber Edit Dialog -->
+    <div id="fiber-dialog" class="dialog-overlay hidden">
+        <div class="dialog glass-panel">
+            <div class="dialog-header">
+                <h2>Edytuj światłowód</h2>
+                <button class="icon-btn dialog-close" id="close-fiber-dialog">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="dialog-body">
+                <div class="form-group">
+                    <label for="fiber-name">Nazwa</label>
+                    <input type="text" id="fiber-name" required maxlength="255" placeholder="Nazwa trasy">
+                </div>
+                <div class="form-group">
+                    <label for="fiber-color">Kolor (HEX)</label>
+                    <div class="color-row">
+                        <input type="color" id="fiber-color-picker" value="#0000FF">
+                        <input type="text" id="fiber-color" placeholder="#0000FF" maxlength="7">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="fiber-thickness">Grubość (px)</label>
+                    <input type="number" id="fiber-thickness" value="3" min="1" max="12">
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button id="fiber-save-btn" class="btn-primary">
+                    <i class="fa-solid fa-floppy-disk"></i> Zapisz
+                </button>
+                <button id="fiber-delete-btn" class="btn-danger admin-only hidden">
+                    <i class="fa-solid fa-trash"></i> Usuń światłowód
+                </button>
+                <button id="close-fiber-dialog-2" class="btn-secondary">
+                    <i class="fa-solid fa-ban"></i> Anuluj
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fiber Selection Overlay -->
+    <div id="fiber-select-overlay" class="status-bar hidden" style="background:rgba(234,179,8,0.9);color:#1a1a1a;">
+        <i class="fa-solid fa-hand-pointer"></i>
+        <span id="fiber-select-msg">Kliknij na światłowód, aby go wybrać</span>
+        <button id="cancel-fiber-select" class="btn-sm btn-secondary" style="margin-left:12px;">
+            <i class="fa-solid fa-xmark"></i> Anuluj
+        </button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/map.js"></script>
+</body>
+</html>

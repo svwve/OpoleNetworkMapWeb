@@ -1,71 +1,100 @@
 package com.example.backend;
 
+import com.example.model.User;
 import com.example.model.Role;
+import com.example.repository.UserRepository;
 import org.mindrot.jbcrypt.BCrypt;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Optional;
 
+@Service
 public class UserService {
 
-    public static Role authenticate(String username, String password) {
-        if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
+    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
+    private final UserRepository userRepository;
+
+    @Autowired
+    public UserService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    public User authenticate(String username, String password) {
+        if (username == null || username.trim().isEmpty() || !isUsablePassword(password)) {
             return null;
         }
 
-        String query = "SELECT password_hash, role FROM users WHERE username = ?";
-
-        try (Connection conn = DatabaseConnector.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(query)) {
-
-            pstmt.setString(1, username.trim());
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    String storedHash = rs.getString("password_hash");
-                    String roleStr = rs.getString("role");
-
-                    // Weryfikacja hasła z hashem w bazie za pomocą BCrypt
-                    if (BCrypt.checkpw(password, storedHash)) {
-                        return Role.valueOf(roleStr.toUpperCase());
-                    }
+        Optional<User> userOpt = userRepository.findByUsername(username.trim());
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            try {
+                if (BCrypt.checkpw(password, user.getPasswordHash())) {
+                    return user;
                 }
+            } catch (IllegalArgumentException exception) {
+                logger.warn("Stored password hash is invalid for user '{}'", username);
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            System.err.println("Błąd bazy danych podczas logowania: " + e.getMessage());
         }
-
-        return null; // Błędny login, hasło lub użytkownik nie istnieje
+        return null;
     }
 
-    // Metoda rejestrująca nowego użytkownika z bezpiecznym hashem
-    public static boolean registerUser(String username, String password, Role role) {
-        if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
+    public boolean registerUser(String username, String password, Role role) {
+        if (username == null || username.trim().isEmpty() || !isUsablePassword(password) || role == null) {
             return false;
         }
 
-        String query = "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)";
+        if (userRepository.findByUsername(username.trim()).isPresent()) {
+            return false;
+        }
 
-        // Generowanie bezpiecznego hashu z podanego hasła
         String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+        User user = new User(username.trim(), hashedPassword, role);
 
-        try (Connection conn = DatabaseConnector.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(query)) {
-
-            pstmt.setString(1, username.trim());
-            pstmt.setString(2, hashedPassword);
-            pstmt.setString(3, role.name());
-
-            int affectedRows = pstmt.executeUpdate();
-            return affectedRows > 0;
-
-        } catch (SQLException e) {
-            // Ewentualny błąd, np. gdy nazwa użytkownika już istnieje (UNIQUE constraint w bazie)
-            e.printStackTrace();
+        try {
+            userRepository.save(user);
+            return true;
+        } catch (DataIntegrityViolationException exception) {
+            logger.info("User registration rejected by a database constraint for username '{}'", username);
             return false;
         }
     }
 
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    public Optional<User> getUserById(Long id) {
+        return userRepository.findById(id);
+    }
+
+    public User updateUser(Long id, String newPassword, Role newRole) {
+        return userRepository.findById(id).map(user -> {
+            if (newPassword != null && !newPassword.trim().isEmpty() && isUsablePassword(newPassword)) {
+                user.setPasswordHash(BCrypt.hashpw(newPassword, BCrypt.gensalt()));
+            }
+            if (newRole != null) {
+                user.setRole(newRole);
+            }
+            return userRepository.save(user);
+        }).orElse(null);
+    }
+
+    private boolean isUsablePassword(String password) {
+        return password != null && !password.trim().isEmpty()
+                && password.getBytes(StandardCharsets.UTF_8).length <= 72;
+    }
+
+    public boolean deleteUser(Long id) {
+        if (userRepository.existsById(id)) {
+            userRepository.deleteById(id);
+            return true;
+        }
+        return false;
+    }
 }

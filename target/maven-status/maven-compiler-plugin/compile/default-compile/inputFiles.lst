@@ -1,13 +1,25 @@
-/Users/karolpilarczyk/Documents/OpoleNetworkMap/src/main/java/com/example/backend/UpdateService.java
-/Users/karolpilarczyk/Documents/OpoleNetworkMap/src/main/java/com/example/backend/UserService.java
-/Users/karolpilarczyk/Documents/OpoleNetworkMap/src/main/java/com/example/backend/Launcher.java
-/Users/karolpilarczyk/Documents/OpoleNetworkMap/src/main/java/com/example/model/Role.java
-/Users/karolpilarczyk/Documents/OpoleNetworkMap/src/main/java/com/example/backend/ProjectService.java
-/Users/karolpilarczyk/Documents/OpoleNetworkMap/src/main/java/com/example/model/Project.java
-/Users/karolpilarczyk/Documents/OpoleNetworkMap/src/main/java/com/example/backend/ProjectsController.java
-/Users/karolpilarczyk/Documents/OpoleNetworkMap/src/main/java/com/example/backend/MainApplication.java
-/Users/karolpilarczyk/Documents/OpoleNetworkMap/src/main/java/com/example/backend/MapController.java
-/Users/karolpilarczyk/Documents/OpoleNetworkMap/src/main/java/com/example/backend/LoginController.java
-/Users/karolpilarczyk/Documents/OpoleNetworkMap/src/main/java/com/example/backend/RegisterController.java
-/Users/karolpilarczyk/Documents/OpoleNetworkMap/src/main/java/com/example/module-info.java
-/Users/karolpilarczyk/Documents/OpoleNetworkMap/src/main/java/com/example/backend/DatabaseConnector.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/repository/FiberRepository.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/controllers/UserController.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/model/Camera.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/controllers/CameraRequest.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/ProjectService.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/controllers/AuthController.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/controllers/MapController.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/repository/CameraRepository.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/controllers/ProjectRequest.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/model/User.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/model/Role.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/config/ApiSessionInterceptor.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/config/WebConfig.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/controllers/FiberRequest.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/model/Fiber.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/controllers/ProjectController.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/controllers/RegisterRequest.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/OpoleNetworkMapApplication.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/repository/ProjectRepository.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/repository/UserRepository.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/controllers/ApiExceptionHandler.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/controllers/UserUpdateRequest.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/UserService.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/backend/controllers/AuthRequest.java
+/Users/karolpilarczyk/Documents/OpoleNetworkMap copy/src/main/java/com/example/model/Project.java
