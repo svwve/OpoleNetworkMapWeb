@@ -9,9 +9,10 @@
 // ═══════════════════════════════════════════════════════════
 
 // Sprawdzenie sesji
-const _username = localStorage.getItem('username');
-const _role     = localStorage.getItem('role');
-if (!_username) { window.location.href = 'index.html'; }
+let _username = localStorage.getItem('username') || '';
+let _role     = localStorage.getItem('role') || '';
+let isAdmin = false;
+if (!_username) { window.location.replace('index.html'); }
 
 const DEFAULT_PROJECT_ID = 1;
 const projectParams = new URLSearchParams(window.location.search);
@@ -19,16 +20,8 @@ const _projectIdRaw = projectParams.get('projectId') ?? projectParams.get('id');
 const projectId = _projectIdRaw === null ? DEFAULT_PROJECT_ID : Number(_projectIdRaw);
 if (!Number.isSafeInteger(projectId) || projectId < 1) { window.location.href = 'projects.html'; }
 
-const isAdmin = (_role === 'ADMIN');
-
 // Wyświetl info
 document.getElementById('project-name-display').textContent = 'Projekt #' + projectId;
-document.getElementById('user-chip').textContent = _username + (isAdmin ? ' · Admin' : '');
-
-// Odkryj elementy admin-only
-if (isAdmin) {
-    document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
-}
 
 // Mapa Leaflet
 const map = L.map('map').setView([50.6667, 17.9222], 13);
@@ -166,6 +159,36 @@ function pushUndo(fiberId, points) {
 // ═══════════════════════════════════════════════════════════
 
 async function loadProjectDataFromDatabase() {
+    try {
+        const sessionResponse = await apiFetch('/api/auth/session');
+        if (!sessionResponse.ok) {
+            throw new Error(`HTTP ${sessionResponse.status}`);
+        }
+        const session = await sessionResponse.json();
+        if (!session.success) {
+            localStorage.removeItem('username');
+            localStorage.removeItem('role');
+            window.location.replace('index.html');
+            return;
+        }
+        _username = session.username;
+        _role = session.role;
+        isAdmin = _role === 'ADMIN';
+        localStorage.setItem('username', _username);
+        localStorage.setItem('role', _role);
+        document.getElementById('user-chip').textContent = _username + (isAdmin ? ' · Admin' : '');
+        document.querySelectorAll('.admin-only').forEach(element => {
+            element.classList.toggle('hidden', !isAdmin);
+        });
+    } catch (error) {
+        console.error('Nie udało się zweryfikować sesji:', error);
+        setStatus('Sesja wygasła. Zaloguj się ponownie.', 4000);
+        localStorage.removeItem('username');
+        localStorage.removeItem('role');
+        window.location.replace('index.html');
+        return;
+    }
+
     const collections = [
         { type: 'camera', url: `/api/map/cameras?projectId=${projectId}`, label: 'kamery' },
         { type: 'radio', url: `/api/map/radios?projectId=${projectId}`, label: 'radia' },
@@ -173,7 +196,7 @@ async function loadProjectDataFromDatabase() {
     ];
     const results = await Promise.all(collections.map(async collection => {
         try {
-            const response = await fetch(collection.url);
+            const response = await apiFetch(collection.url);
             await ensureResponseOk(response, `Pobieranie ${collection.label}`);
             const data = await response.json();
             if (!Array.isArray(data)) {
@@ -410,7 +433,7 @@ async function persistDeviceVisibility(type, id, previousVisible) {
     const device = collection[id];
     if (!device) return;
     try {
-        const response = await fetch(`/api/map/${type === 'radio' ? 'radios' : 'cameras'}/${id}`, {
+        const response = await apiFetch(`/api/map/${type === 'radio' ? 'radios' : 'cameras'}/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(device.data)
@@ -575,7 +598,7 @@ async function saveCameraDialog() {
             isVisible: true
         };
         try {
-            const res = await fetch(`/api/map/${resource}`, {
+            const res = await apiFetch(`/api/map/${resource}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -603,7 +626,7 @@ async function saveCameraDialog() {
         device.data.photoBase64 = photo;
 
         try {
-            const res = await fetch(`/api/map/${resource}/${editingDeviceId}`, {
+            const res = await apiFetch(`/api/map/${resource}/${editingDeviceId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(device.data)
@@ -634,7 +657,7 @@ async function deleteDevice(type, id) {
     const device = collection[id];
     if (!isAdmin || !device || !confirm(`Czy na pewno usunąć ${label}?`)) return;
     try {
-        const response = await fetch(`/api/map/${resource}/${id}`, { method: 'DELETE' });
+        const response = await apiFetch(`/api/map/${resource}/${id}`, { method: 'DELETE' });
         await ensureResponseOk(response, `Usuwanie ${label}`);
         map.removeLayer(device.marker);
         delete collection[id];
@@ -863,7 +886,7 @@ async function persistFiberVisibility(id, previousVisible) {
     const fb = fibers[id];
     if (!fb) return;
     try {
-        const response = await fetch(`/api/map/fibers/${id}`, {
+        const response = await apiFetch(`/api/map/fibers/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(fb.data)
@@ -960,7 +983,7 @@ async function finishFiberDrawing() {
     try {
         isSavingFiber = true;
         updateFiberDrawingControls();
-        const res = await fetch('/api/map/fibers', {
+        const res = await apiFetch('/api/map/fibers', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1045,7 +1068,7 @@ async function finishAppendFiber() {
     try {
         isSavingFiber = true;
         updateFiberDrawingControls();
-        const res = await fetch(`/api/map/fibers/${fiberId}`, {
+        const res = await apiFetch(`/api/map/fibers/${fiberId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(fb.data)
@@ -1097,7 +1120,7 @@ async function undoLastFiberChange(id) {
     fb.data.pathJson = JSON.stringify(stack[stack.length - 1]);
 
     try {
-        const res = await fetch(`/api/map/fibers/${id}`, {
+        const res = await apiFetch(`/api/map/fibers/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(fb.data)
@@ -1173,7 +1196,7 @@ async function removeFiberVertex(fiberId, vertexIndex) {
     fb.data.pathJson = JSON.stringify(pts);
 
     try {
-        const res = await fetch(`/api/map/fibers/${fiberId}`, {
+        const res = await apiFetch(`/api/map/fibers/${fiberId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(fb.data)
@@ -1248,7 +1271,7 @@ async function editFiberData() {
     fb.data.thickness = thickness;
 
     try {
-        const res = await fetch(`/api/map/fibers/${fiberId}`, {
+        const res = await apiFetch(`/api/map/fibers/${fiberId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(fb.data)
@@ -1277,7 +1300,7 @@ async function deleteFiber(id) {
         return;
     }
     try {
-        const response = await fetch(`/api/map/fibers/${id}`, { method: 'DELETE' });
+        const response = await apiFetch(`/api/map/fibers/${id}`, { method: 'DELETE' });
         await ensureResponseOk(response, 'Usuwanie światłowodu');
         if (fiber.polyline) map.removeLayer(fiber.polyline);
         delete fibers[id];

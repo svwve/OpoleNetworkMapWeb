@@ -25,6 +25,19 @@ public class AuthController {
         this.userService = userService;
     }
 
+    @GetMapping("/session")
+    public ResponseEntity<Map<String, Object>> session(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null || session.getAttribute("username") == null) {
+            return ResponseEntity.ok(Map.of("success", false));
+        }
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "username", session.getAttribute("username"),
+                "role", session.getAttribute("role")
+        ));
+    }
+
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(
             @Valid @RequestBody AuthRequest credentials, HttpServletRequest request) {

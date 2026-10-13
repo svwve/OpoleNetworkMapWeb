@@ -36,6 +36,17 @@ class ApiSessionInterceptorTest {
     }
 
     @Test
+    void allowsSessionCheckWithoutAnExistingSession() throws Exception {
+        HttpServletRequest request = request("GET", "/api/auth/session", null);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+
+        assertTrue(interceptor.preHandle(request, response, new Object()));
+        verify(request, never()).getSession(false);
+        verify(response, never()).sendError(org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
     void rejectsWritesFromOperatorSessions() throws Exception {
         HttpServletRequest request = request("POST", "/api/map/cameras", "OPERATOR");
         when(request.getHeader("Origin")).thenReturn("http://localhost:8080");

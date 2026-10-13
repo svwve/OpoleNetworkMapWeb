@@ -53,13 +53,23 @@
 
     <script src="js/app.js"></script>
     <script>
-        const username = localStorage.getItem('username');
-
-        if (!username) {
-            window.location.href = 'index.html';
-        } else {
-            window.location.replace('map.html?projectId=1');
-        }
+        apiFetch('/api/auth/session')
+            .then(response => response.json())
+            .then(session => {
+                if (!session.success) {
+                    localStorage.removeItem('username');
+                    localStorage.removeItem('role');
+                    window.location.replace('index.html');
+                    return;
+                }
+                localStorage.setItem('username', session.username);
+                localStorage.setItem('role', session.role);
+                window.location.replace('map.html?projectId=1');
+            })
+            .catch(error => {
+                console.error('Nie udało się sprawdzić sesji:', error);
+                window.location.replace('index.html');
+            });
     </script>
 </body>
 </html>

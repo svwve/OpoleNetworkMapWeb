@@ -22,7 +22,8 @@ public class ApiSessionInterceptor implements HandlerInterceptor {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         boolean publicAuthRequest = "POST".equals(request.getMethod())
                 && ("/api/auth/login".equals(path) || "/api/auth/register".equals(path));
-        if (publicAuthRequest) {
+        boolean sessionCheck = "GET".equals(request.getMethod()) && "/api/auth/session".equals(path);
+        if (publicAuthRequest || sessionCheck) {
             return true;
         }
 

@@ -1,18 +1,41 @@
+window.apiFetch = async function(input, options = {}) {
+    const response = await fetch(input, { ...options, credentials: 'same-origin' });
+    const requestPath = new URL(input, window.location.href).pathname;
+    if (response.status === 401 &&
+        !['/api/auth/login', '/api/auth/register', '/api/auth/session'].includes(requestPath)) {
+        localStorage.removeItem('username');
+        localStorage.removeItem('role');
+        window.location.replace('index.html');
+    }
+    return response;
+};
+
 document.addEventListener('DOMContentLoaded', () => {
-    if (localStorage.getItem('username') && document.getElementById('login-form')) {
-        window.location.replace('map.html?projectId=1');
-        return;
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        apiFetch('/api/auth/session')
+            .then(response => response.json())
+            .then(session => {
+                if (session.success) {
+                    localStorage.setItem('username', session.username);
+                    localStorage.setItem('role', session.role);
+                    window.location.replace('map.html?projectId=1');
+                } else {
+                    localStorage.removeItem('username');
+                    localStorage.removeItem('role');
+                }
+            })
+            .catch(error => console.error('Nie udało się sprawdzić sesji:', error));
     }
 
     // ── Logowanie ─────────────────────────────────────────────────────────────
-    const loginForm = document.getElementById('login-form');
     if (loginForm) {
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
 
-            fetch('/api/auth/login', {
+            apiFetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
@@ -39,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const username = document.getElementById('reg-username').value;
             const password = document.getElementById('reg-password').value;
 
-            fetch('/api/auth/register', {
+            apiFetch('/api/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
@@ -70,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
             try {
-                await fetch('/api/auth/logout', { method: 'POST' });
+                await apiFetch('/api/auth/logout', { method: 'POST' });
             } catch (error) {
                 console.error('Błąd wylogowania:', error);
             }
@@ -97,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const name = document.getElementById('project-name').value.trim();
             if (!name) return;
 
-            fetch('/api/projects', {
+            apiFetch('/api/projects', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name })
@@ -148,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmDeleteBtn.textContent = 'Usuwanie...';
 
             try {
-                const res = await fetch(`/api/projects/${pendingDeleteId}`, { method: 'DELETE' });
+                const res = await apiFetch(`/api/projects/${pendingDeleteId}`, { method: 'DELETE' });
                 if (res.ok) {
                     deleteModal.classList.add('hidden');
                     pendingDeleteId = null;
@@ -200,7 +223,7 @@ window.loadProjects = function() {
 
     container.innerHTML = '<div class="loading">Ładowanie projektów...</div>';
 
-    fetch('/api/projects')
+    apiFetch('/api/projects')
         .then(async res => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
