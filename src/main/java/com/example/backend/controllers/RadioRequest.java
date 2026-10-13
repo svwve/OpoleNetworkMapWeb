@@ -1,5 +1,6 @@
 package com.example.backend.controllers;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -15,7 +16,9 @@ public record RadioRequest(
         @Size(max = 7_000_000)
         @Pattern(regexp = "^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$")
         String photoBase64,
+        @JsonAlias("latitude")
         @NotNull @DecimalMin("-90.0") @DecimalMax("90.0") Double lat,
+        @JsonAlias("longitude")
         @NotNull @DecimalMin("-180.0") @DecimalMax("180.0") Double lng,
         Boolean isVisible) {
 }

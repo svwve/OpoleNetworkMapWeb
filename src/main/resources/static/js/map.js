@@ -78,8 +78,15 @@ function clearStatus() {
 
 async function ensureResponseOk(response, action) {
     if (response.ok) return;
-    const details = (await response.text()).slice(0, 300);
-    throw new Error(`${action}: HTTP ${response.status}${details ? ` — ${details}` : ''}`);
+    const body = await response.text();
+    let details = body;
+    try {
+        const errorBody = JSON.parse(body);
+        details = errorBody.error || errorBody.message || body;
+    } catch {
+        // Keep the original response body when it is not JSON.
+    }
+    throw new Error(`${action}: HTTP ${response.status}${details ? ` — ${details.slice(0, 300)}` : ''}`);
 }
 
 function parseCoordinate(value) {
@@ -589,33 +596,28 @@ async function saveCameraDialog() {
             return;
         }
         const payload = {
-            projectId: parseInt(projectId, 10),
-            lat: pendingCameraLatLng.lat,
-            lng: pendingCameraLatLng.lng,
+            projectId: Number(projectId),
+            lat: Number(pendingCameraLatLng.lat),
+            lng: Number(pendingCameraLatLng.lng),
             name,
             description: desc || null,
-            photoBase64: photo,
             isVisible: true
         };
+        if (photo) payload.photoBase64 = photo;
         try {
             const res = await apiFetch(`/api/map/${resource}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            if (!res.ok) {
-                const txt = await res.text();
-                console.error(`Błąd serwera (${typeName} POST):`, res.status, txt);
-                setStatus(`Nie udało się zapisać ${typeName} (HTTP ${res.status})`, 3000);
-                return;
-            }
+            await ensureResponseOk(res, `Zapis ${typeName}`);
             const saved = await res.json();
             addDeviceToMap(type, saved);
             closeCameraDialog();
             setStatus(`${type === 'radio' ? 'Radio dodane' : 'Kamera dodana'}`, 2500);
         } catch (e) {
             console.error(`Błąd zapisu ${typeName}:`, e);
-            setStatus(`Błąd zapisu ${typeName}`, 3000);
+            setStatus(`Błąd zapisu ${typeName}: ${e.message}`, 6000);
         }
     } else {
         const device = collection[editingDeviceId];

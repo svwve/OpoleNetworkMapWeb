@@ -131,6 +131,24 @@ class MapControllerTest {
     }
 
     @Test
+    void savesRadioWhenCoordinatesUseLatitudeAndLongitudeAndPhotoIsOmitted() throws Exception {
+        when(projectRepository.existsById(7L)).thenReturn(true);
+        when(radioRepository.save(any(Radio.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        mockMvc.perform(post("/api/map/radios")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":7,"name":"Radio","latitude":50.6,"longitude":17.9}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Radio"))
+                .andExpect(jsonPath("$.lat").value(50.6))
+                .andExpect(jsonPath("$.lng").value(17.9));
+
+        verify(radioRepository).save(any(Radio.class));
+    }
+
+    @Test
     void rejectsRadioWithoutProjectBeforeSaving() throws Exception {
         when(projectRepository.existsById(7L)).thenReturn(false);
         RadioRequest request = new RadioRequest(
