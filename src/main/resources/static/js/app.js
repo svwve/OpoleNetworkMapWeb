@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (session.success) {
                     localStorage.setItem('username', session.username);
                     localStorage.setItem('role', session.role);
-                    window.location.replace('map.html?projectId=1');
+                    window.location.replace('map.html');
                 } else {
                     localStorage.removeItem('username');
                     localStorage.removeItem('role');
@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (ok && data.success) {
                     localStorage.setItem('username', data.username);
                     localStorage.setItem('role', data.role);
-                    window.location.replace('map.html?projectId=1');
+                    window.location.replace('map.html');
                 } else {
                     showError(data.message || 'Błąd logowania');
                 }
@@ -245,7 +245,7 @@ window.loadProjects = function() {
                         <p>ID: ${project.id}</p>
                     </div>
                     <div class="project-card-actions">
-                        <a href="map.html?id=${project.id}" class="btn-primary">Otwórz Mapę</a>
+                        <a href="map.html?projectId=${project.id}" class="btn-primary">Otwórz Mapę</a>
                         ${isAdmin ? `<button class="btn-delete-project" data-id="${project.id}" data-name="${escapeHtml(project.name)}"><i class="fa-solid fa-trash" aria-hidden="true"></i> Usuń</button>` : ''}
                     </div>`;
 

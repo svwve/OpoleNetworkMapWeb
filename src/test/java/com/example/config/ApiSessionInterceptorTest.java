@@ -61,6 +61,20 @@ class ApiSessionInterceptorTest {
     }
 
     @Test
+    void allowsOperatorToInitializeDefaultProject() throws Exception {
+        HttpServletRequest request = request("POST", "/api/projects/initialize", "OPERATOR");
+        when(request.getHeader("Origin")).thenReturn("http://localhost:8080");
+        when(request.getScheme()).thenReturn("http");
+        when(request.getServerName()).thenReturn("localhost");
+        when(request.getServerPort()).thenReturn(8080);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+
+        assertTrue(interceptor.preHandle(request, response, new Object()));
+        verify(response, never()).sendError(org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
     void restrictsUserDirectoryToAdministrators() throws Exception {
         HttpServletRequest request = request("GET", "/api/users", "OPERATOR");
         HttpServletResponse response = mock(HttpServletResponse.class);

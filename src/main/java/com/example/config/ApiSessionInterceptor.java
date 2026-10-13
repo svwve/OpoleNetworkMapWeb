@@ -23,6 +23,8 @@ public class ApiSessionInterceptor implements HandlerInterceptor {
         boolean publicAuthRequest = "POST".equals(request.getMethod())
                 && ("/api/auth/login".equals(path) || "/api/auth/register".equals(path));
         boolean sessionCheck = "GET".equals(request.getMethod()) && "/api/auth/session".equals(path);
+        boolean initializeProject = "POST".equals(request.getMethod())
+                && "/api/projects/initialize".equals(path);
         if (publicAuthRequest || sessionCheck) {
             return true;
         }
@@ -44,7 +46,7 @@ public class ApiSessionInterceptor implements HandlerInterceptor {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Dostęp do zarządzania użytkownikami wymaga uprawnień administratora.");
             return false;
         }
-        if (isMutation(request.getMethod()) && !logout && !admin) {
+        if (isMutation(request.getMethod()) && !logout && !initializeProject && !admin) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Ta operacja wymaga uprawnień administratora.");
             return false;
         }

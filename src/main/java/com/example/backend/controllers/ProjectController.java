@@ -34,6 +34,15 @@ public class ProjectController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PostMapping("/initialize")
+    public ResponseEntity<?> initializeDefaultProject(HttpSession session) {
+        Object sessionUserId = session.getAttribute("userId");
+        if (!(sessionUserId instanceof Integer userId)) {
+            return ResponseEntity.status(401).body(Map.of("error", "Zaloguj się ponownie."));
+        }
+        return ResponseEntity.ok(projectService.getOrCreateDefaultProject(userId));
+    }
+
     @PostMapping
     public ResponseEntity<?> createProject(@Valid @RequestBody ProjectRequest request, HttpSession session) {
         Object sessionUserId = session.getAttribute("userId");

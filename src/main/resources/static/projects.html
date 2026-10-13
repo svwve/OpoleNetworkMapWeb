@@ -64,7 +64,7 @@
                 }
                 localStorage.setItem('username', session.username);
                 localStorage.setItem('role', session.role);
-                window.location.replace('map.html?projectId=1');
+                window.location.replace('map.html');
             })
             .catch(error => {
                 console.error('Nie udało się sprawdzić sesji:', error);

@@ -35,6 +35,14 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
+    public synchronized Project getOrCreateDefaultProject(Integer userId) {
+        List<Project> projects = projectRepository.findAll();
+        if (!projects.isEmpty()) {
+            return projects.get(0);
+        }
+        return projectRepository.save(new Project(null, "Opole", userId));
+    }
+
     public Project updateProject(Long id, String name, Integer userId) {
         return projectRepository.findById(id).map(project -> {
             if (name != null && !name.trim().isEmpty()) {

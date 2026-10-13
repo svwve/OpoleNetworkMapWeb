@@ -14,14 +14,13 @@ let _role     = localStorage.getItem('role') || '';
 let isAdmin = false;
 if (!_username) { window.location.replace('index.html'); }
 
-const DEFAULT_PROJECT_ID = 1;
 const projectParams = new URLSearchParams(window.location.search);
 const _projectIdRaw = projectParams.get('projectId') ?? projectParams.get('id');
-const projectId = _projectIdRaw === null ? DEFAULT_PROJECT_ID : Number(_projectIdRaw);
-if (!Number.isSafeInteger(projectId) || projectId < 1) { window.location.href = 'projects.html'; }
+const requestedProjectId = _projectIdRaw === null ? null : Number(_projectIdRaw);
+let projectId = null;
 
 // Wyświetl info
-document.getElementById('project-name-display').textContent = 'Projekt #' + projectId;
+document.getElementById('project-name-display').textContent = 'Ładowanie projektu…';
 
 // Mapa Leaflet
 const map = L.map('map').setView([50.6667, 17.9222], 13);
@@ -87,6 +86,47 @@ async function ensureResponseOk(response, action) {
         // Keep the original response body when it is not JSON.
     }
     throw new Error(`${action}: HTTP ${response.status}${details ? ` — ${details.slice(0, 300)}` : ''}`);
+}
+
+function isValidProjectId(id) {
+    const value = Number(id);
+    return Number.isSafeInteger(value) && value > 0;
+}
+
+async function resolveActiveProject() {
+    if (isValidProjectId(requestedProjectId)) {
+        try {
+            const response = await apiFetch(`/api/projects/${requestedProjectId}`);
+            if (response.status === 401) {
+                throw new Error('Sesja wygasła. Zaloguj się ponownie.');
+            }
+            if (response.ok) {
+                const project = await response.json();
+                if (project && isValidProjectId(project.id)) return project;
+            }
+        } catch (error) {
+            if (error.message.includes('Sesja wygasła')) throw error;
+            console.warn(`Nie udało się pobrać projektu ${requestedProjectId}; wybieram projekt domyślny.`, error);
+        }
+    }
+
+    const projectsResponse = await apiFetch('/api/projects');
+    await ensureResponseOk(projectsResponse, 'Pobieranie projektów');
+    const projects = await projectsResponse.json();
+    if (!Array.isArray(projects)) {
+        throw new Error('Serwer zwrócił nieprawidłową listę projektów.');
+    }
+
+    const firstProject = projects.find(project => project && isValidProjectId(project.id));
+    if (firstProject) return firstProject;
+
+    const initializeResponse = await apiFetch('/api/projects/initialize', { method: 'POST' });
+    await ensureResponseOk(initializeResponse, 'Inicjalizacja projektu Opole');
+    const initializedProject = await initializeResponse.json();
+    if (!initializedProject || !isValidProjectId(initializedProject.id)) {
+        throw new Error('Serwer nie zwrócił prawidłowego ID projektu Opole.');
+    }
+    return initializedProject;
 }
 
 function parseCoordinate(value) {
@@ -193,6 +233,21 @@ async function loadProjectDataFromDatabase() {
         localStorage.removeItem('username');
         localStorage.removeItem('role');
         window.location.replace('index.html');
+        return;
+    }
+
+    try {
+        const project = await resolveActiveProject();
+        projectId = Number(project.id);
+        document.getElementById('project-name-display').textContent =
+            project.name || `Projekt #${projectId}`;
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.delete('id');
+        currentUrl.searchParams.set('projectId', String(projectId));
+        window.history.replaceState(null, '', currentUrl);
+    } catch (error) {
+        console.error('Nie udało się ustalić aktywnego projektu:', error);
+        setStatus(`Nie udało się załadować projektu: ${error.message}`, 8000);
         return;
     }
 
@@ -443,7 +498,7 @@ async function persistDeviceVisibility(type, id, previousVisible) {
         const response = await apiFetch(`/api/map/${type === 'radio' ? 'radios' : 'cameras'}/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(device.data)
+            body: JSON.stringify({ ...device.data, projectId })
         });
         await ensureResponseOk(response, `Aktualizacja widoczności ${type === 'radio' ? 'radia' : 'kamery'}`);
         device.data = await response.json();
@@ -591,6 +646,10 @@ async function saveCameraDialog() {
     }
 
     if (cameraDialogMode === 'add') {
+        if (!isValidProjectId(projectId)) {
+            setStatus('Projekt jest jeszcze ładowany. Spróbuj ponownie za chwilę.', 3000);
+            return;
+        }
         if (!pendingCameraLatLng) {
             setStatus('Brak współrzędnych — kliknij najpierw na mapę', 3000);
             return;
@@ -631,7 +690,7 @@ async function saveCameraDialog() {
             const res = await apiFetch(`/api/map/${resource}/${editingDeviceId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(device.data)
+                body: JSON.stringify({ ...device.data, projectId })
             });
             await ensureResponseOk(res, `Aktualizacja ${typeName}`);
             const updated = await res.json();
@@ -891,7 +950,7 @@ async function persistFiberVisibility(id, previousVisible) {
         const response = await apiFetch(`/api/map/fibers/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(fb.data)
+            body: JSON.stringify({ ...fb.data, projectId })
         });
         await ensureResponseOk(response, 'Aktualizacja widoczności światłowodu');
         fb.data = await response.json();
@@ -958,6 +1017,10 @@ function appendRoutePoint(latlng) {
 
 async function finishFiberDrawing() {
     if (isSavingFiber) return;
+    if (!isValidProjectId(projectId)) {
+        setStatus('Projekt jest jeszcze ładowany. Spróbuj ponownie za chwilę.', 3000);
+        return;
+    }
     if (fiberDrawPoints.length < 2) {
         setStatus('Dodaj co najmniej 2 punkty przed zapisaniem światłowodu.', 3000);
         return;
@@ -974,7 +1037,7 @@ async function finishFiberDrawing() {
     const pts = fiberDrawPoints.map(point => [...point]);
 
     const payload = {
-        projectId: parseInt(projectId, 10),
+        projectId: Number(projectId),
         name: name.trim(),
         pathJson: JSON.stringify(pts),
         color: '#0000FF',
@@ -1073,7 +1136,7 @@ async function finishAppendFiber() {
         const res = await apiFetch(`/api/map/fibers/${fiberId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(fb.data)
+            body: JSON.stringify({ ...fb.data, projectId })
         });
         await ensureResponseOk(res, 'Dorysowywanie światłowodu');
         const updated = await res.json();
@@ -1125,7 +1188,7 @@ async function undoLastFiberChange(id) {
         const res = await apiFetch(`/api/map/fibers/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(fb.data)
+            body: JSON.stringify({ ...fb.data, projectId })
         });
         await ensureResponseOk(res, 'Cofanie zmiany światłowodu');
         const updated = await res.json();
@@ -1201,7 +1264,7 @@ async function removeFiberVertex(fiberId, vertexIndex) {
         const res = await apiFetch(`/api/map/fibers/${fiberId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(fb.data)
+            body: JSON.stringify({ ...fb.data, projectId })
         });
         await ensureResponseOk(res, 'Usuwanie wierzchołka');
         const updated = await res.json();
@@ -1276,7 +1339,7 @@ async function editFiberData() {
         const res = await apiFetch(`/api/map/fibers/${fiberId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(fb.data)
+            body: JSON.stringify({ ...fb.data, projectId })
         });
         await ensureResponseOk(res, 'Aktualizacja światłowodu');
         const updated = await res.json();
@@ -1375,7 +1438,7 @@ document.getElementById('sidebar-toggle').addEventListener('click', () => {
 
 // Wróć do projektów
 document.getElementById('back-to-projects').addEventListener('click', () => {
-    window.location.href = 'map.html?projectId=1';
+    window.location.href = 'map.html';
 });
 
 // Zakładki
