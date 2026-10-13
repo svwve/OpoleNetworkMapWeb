@@ -14,7 +14,8 @@ const _role     = localStorage.getItem('role');
 if (!_username) { window.location.href = 'index.html'; }
 
 const DEFAULT_PROJECT_ID = 1;
-const _projectIdRaw = new URLSearchParams(window.location.search).get('id');
+const projectParams = new URLSearchParams(window.location.search);
+const _projectIdRaw = projectParams.get('projectId') ?? projectParams.get('id');
 const projectId = _projectIdRaw === null ? DEFAULT_PROJECT_ID : Number(_projectIdRaw);
 if (!Number.isSafeInteger(projectId) || projectId < 1) { window.location.href = 'projects.html'; }
 
