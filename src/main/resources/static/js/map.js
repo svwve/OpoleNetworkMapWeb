@@ -13,9 +13,10 @@ const _username = localStorage.getItem('username');
 const _role     = localStorage.getItem('role');
 if (!_username) { window.location.href = 'index.html'; }
 
+const DEFAULT_PROJECT_ID = 1;
 const _projectIdRaw = new URLSearchParams(window.location.search).get('id');
-const projectId = parseInt(_projectIdRaw, 10);
-if (!projectId || isNaN(projectId)) { window.location.href = 'projects.html'; }
+const projectId = _projectIdRaw === null ? DEFAULT_PROJECT_ID : Number(_projectIdRaw);
+if (!Number.isSafeInteger(projectId) || projectId < 1) { window.location.href = 'projects.html'; }
 
 const isAdmin = (_role === 'ADMIN');
 
@@ -111,6 +112,7 @@ function exitMode() {
     fiberAppendOriginalPointCount = 0;
     isSavingFiber = false;
     if (fiberDrawLine) { map.removeLayer(fiberDrawLine); fiberDrawLine = null; }
+    clearVertexMarkers();
     setCursor(null);
     clearStatus();
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
@@ -180,7 +182,7 @@ async function loadProjectDataFromDatabase() {
         let cameraCount = 0;
         camsData.forEach(camera => {
             try {
-                if (addCameraToMap(camera)) cameraCount++;
+                if (addCameraToMap(camera, false)) cameraCount++;
             } catch (error) {
                 console.error('Nie udało się wyświetlić kamery:', camera?.id, error);
             }
@@ -188,12 +190,15 @@ async function loadProjectDataFromDatabase() {
         let fiberCount = 0;
         fibsData.forEach(fiber => {
             try {
-                if (addFiberToMap(fiber)) fiberCount++;
+                if (addFiberToMap(fiber, false)) fiberCount++;
             } catch (error) {
                 console.error('Nie udało się wyświetlić światłowodu:', fiber?.id, error);
             }
         });
 
+        renderCamerasList();
+        renderFibersList();
+        updateFiberToolStates();
         setStatus(`Załadowano: ${cameraCount} kamer, ${fiberCount} światłowodów`, 3000);
     } catch (err) {
         console.error('Błąd ładowania danych:', err);
@@ -215,7 +220,7 @@ function createCameraIcon(visible = true) {
     });
 }
 
-function addCameraToMap(data) {
+function addCameraToMap(data, render = true) {
     if (!data || data.id === null || data.id === undefined) {
         console.error('Pominięto kamerę bez identyfikatora.');
         return false;
@@ -237,7 +242,7 @@ function addCameraToMap(data) {
     marker.on('click', () => openCameraDetailsDialog('edit', null, data.id));
 
     cameras[data.id] = { data, marker, visible };
-    renderCamerasList();
+    if (render) renderCamerasList();
     return true;
 }
 
@@ -547,7 +552,7 @@ function parsePoints(pathJson) {
     return points;
 }
 
-function addFiberToMap(data) {
+function addFiberToMap(data, render = true) {
     if (!data || data.id === null || data.id === undefined) {
         console.error('Pominięto światłowód bez identyfikatora.');
         return false;
@@ -565,14 +570,18 @@ function addFiberToMap(data) {
     data.thickness = thickness;
     const polyline = L.polyline(points, {
         color,
-        weight: thickness,
+        weight: getFiberStrokeWeight(thickness),
         opacity: visible ? 1 : 0.15
     }).addTo(map);
 
     polyline.on('click', event => {
         if (activeMode === 'select-fiber') {
             handleFiberSelected(data.id, event.latlng);
-        } else {
+        } else if (activeMode === 'append-fiber') {
+            appendRoutePoint(event.latlng);
+        } else if (activeMode === 'draw-fiber') {
+            addDrawPoint(event.latlng);
+        } else if (activeMode === null) {
             openFiberDialog(data.id);
         }
     });
@@ -585,8 +594,18 @@ function addFiberToMap(data) {
 
     fibers[data.id] = { data, polyline, visible };
     fiberUndoStack[data.id] = [];
-    renderFibersList();
+    if (render) {
+        renderFibersList();
+        updateFiberToolStates();
+    }
     return true;
+}
+
+function getFiberStrokeWeight(thickness) {
+    const requestedThickness = Number(thickness);
+    const baseThickness = Number.isInteger(requestedThickness) &&
+        requestedThickness >= 1 && requestedThickness <= 12 ? requestedThickness : 3;
+    return baseThickness * map.getZoomScale(map.getZoom(), 13);
 }
 
 function refreshFiberPolyline(id) {
@@ -598,11 +617,25 @@ function refreshFiberPolyline(id) {
         fb.polyline.setLatLngs(points);
         fb.polyline.setStyle({
             color: fb.data.color || '#0000FF',
-            weight: fb.data.thickness || 3,
+            weight: getFiberStrokeWeight(fb.data.thickness),
             opacity: fb.visible ? 1 : 0.15
         });
     }
 }
+
+function refreshFiberStrokeWidths() {
+    Object.values(fibers).forEach(({ data, polyline }) => {
+        polyline.setStyle({ weight: getFiberStrokeWeight(data.thickness) });
+    });
+    if (fiberDrawLine) {
+        const thickness = activeFiberId && fibers[activeFiberId]
+            ? fibers[activeFiberId].data.thickness
+            : 3;
+        fiberDrawLine.setStyle({ weight: getFiberStrokeWeight(thickness) });
+    }
+}
+
+map.on('zoomend', refreshFiberStrokeWidths);
 
 function renderFibersList() {
     const list = document.getElementById('fibers-list');
@@ -647,7 +680,7 @@ function renderFibersList() {
         });
         item.addEventListener('click', () => {
             const pts = parsePoints(data.pathJson);
-            if (pts.length) map.fitBounds(L.polyline(pts).getBounds(), { padding: [40, 40] });
+            if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [40, 40] });
             highlightFiber(data.id);
         });
         if (isAdmin) {
@@ -746,7 +779,11 @@ function addDrawPoint(latlng) {
     fiberDrawPoints.push([latlng.lat, latlng.lng]);
     if (fiberDrawLine) map.removeLayer(fiberDrawLine);
     if (fiberDrawPoints.length > 1) {
-        fiberDrawLine = L.polyline(fiberDrawPoints, { color: '#facc15', weight: 3, dashArray: '6,4' }).addTo(map);
+        fiberDrawLine = L.polyline(fiberDrawPoints, {
+            color: '#facc15',
+            weight: getFiberStrokeWeight(3),
+            dashArray: '6,4'
+        }).addTo(map);
     }
     updateFiberDrawingControls();
 }
@@ -761,7 +798,9 @@ function appendRoutePoint(latlng) {
         : '#facc15';
     fiberDrawLine = L.polyline(fiberDrawPoints, {
         color: /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#facc15',
-        weight: 3,
+        weight: getFiberStrokeWeight(activeFiberId && fibers[activeFiberId]
+            ? fibers[activeFiberId].data.thickness
+            : 3),
         dashArray: '6,4'
     }).addTo(map);
     updateFiberDrawingControls();
@@ -858,7 +897,11 @@ function enableFiberEndPointsSelection(id, clickedLatLng) {
     setCursor('crosshair');
     setStatus(`Dorysowywanie od ${appendFromStart ? 'początku' : 'końca'} trasy. Zakończ przyciskiem „Zapisz zmiany” w panelu.`, 0);
     if (fiberDrawLine) map.removeLayer(fiberDrawLine);
-    fiberDrawLine = L.polyline(fiberDrawPoints, { color: fibers[id].data.color || '#facc15', weight: 3, dashArray: '6,4' }).addTo(map);
+    fiberDrawLine = L.polyline(fiberDrawPoints, {
+        color: fibers[id].data.color || '#facc15',
+        weight: getFiberStrokeWeight(fibers[id].data.thickness),
+        dashArray: '6,4'
+    }).addTo(map);
     updateFiberDrawingControls();
 }
 
@@ -887,6 +930,7 @@ async function finishAppendFiber() {
         pushUndo(fiberId, parsePoints(previousData.pathJson));
         fb.data = updated;
         refreshFiberPolyline(fiberId);
+        editingFiberId = fiberId;
         exitMode();
         setStatus('Trasa zaktualizowana', 2500);
     } catch (e) {
@@ -908,6 +952,9 @@ function handleFiberSelected(id, clickedLatLng) {
             enableFiberEndPointsSelection(id, clickedLatLng);
         } else if (pendingAction === 'btn-vertex-delete') {
             enableVertexDeletion(id);
+        } else if (pendingAction === 'btn-edit-fiber') {
+            exitMode();
+            openFiberDialog(id);
         }
     }
 }
@@ -1099,14 +1146,20 @@ async function editFiberData() {
 
 async function deleteFiber(id) {
     if (!isAdmin || !confirm('Czy na pewno usunąć ten światłowód?')) return;
+    const fiber = fibers[id];
+    if (!fiber) {
+        setStatus('Nie znaleziono światłowodu', 3000);
+        return;
+    }
     try {
         const response = await fetch(`/api/map/fibers/${id}`, { method: 'DELETE' });
         await ensureResponseOk(response, 'Usuwanie światłowodu');
-        if (fibers[id].polyline) map.removeLayer(fibers[id].polyline);
+        if (fiber.polyline) map.removeLayer(fiber.polyline);
         delete fibers[id];
         delete fiberUndoStack[id];
         closeFiberDialog();
         renderFibersList();
+        updateFiberToolStates();
         setStatus('Światłowód usunięty', 2500);
     } catch (e) {
         console.error(e);
@@ -1316,7 +1369,7 @@ window.syncElements = function(type, dataArray) {
                     existing.marker.setLatLng([coordinates.lat, coordinates.lng]);
                     existing.marker.setIcon(createCameraIcon(existing.visible));
                 } else {
-                    addCameraToMap(data);
+                    addCameraToMap(data, false);
                 }
             } catch (error) {
                 console.error('Nie udało się zsynchronizować kamery:', c?.id, error);
@@ -1340,13 +1393,14 @@ window.syncElements = function(type, dataArray) {
                     existing.visible = data.isVisible !== false;
                     refreshFiberPolyline(f.id);
                 } else {
-                    addFiberToMap(data);
+                    addFiberToMap(data, false);
                 }
             } catch (error) {
                 console.error('Nie udało się zsynchronizować światłowodu:', f?.id, error);
             }
         });
         renderFibersList();
+        updateFiberToolStates();
     }
 };
 

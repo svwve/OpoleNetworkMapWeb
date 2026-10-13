@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (ok && data.success) {
                     localStorage.setItem('username', data.username);
                     localStorage.setItem('role', data.role);
-                    window.location.href = 'projects.html';
+                    window.location.href = 'map.html?id=1';
                 } else {
                     showError(data.message || 'Błąd logowania');
                 }
