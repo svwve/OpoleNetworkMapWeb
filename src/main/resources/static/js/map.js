@@ -166,57 +166,66 @@ function pushUndo(fiberId, points) {
 // ═══════════════════════════════════════════════════════════
 
 async function loadProjectDataFromDatabase() {
-    try {
-        const [camsRes, radiosRes, fibsRes] = await Promise.all([
-            fetch(`/api/map/cameras?projectId=${projectId}`),
-            fetch(`/api/map/radios?projectId=${projectId}`),
-            fetch(`/api/map/fibers?projectId=${projectId}`)
-        ]);
-
-        if (!camsRes.ok || !radiosRes.ok || !fibsRes.ok) {
-            throw new Error(`Błąd pobierania danych (kamery: ${camsRes.status}, radia: ${radiosRes.status}, światłowody: ${fibsRes.status})`);
+    const collections = [
+        { type: 'camera', url: `/api/map/cameras?projectId=${projectId}`, label: 'kamery' },
+        { type: 'radio', url: `/api/map/radios?projectId=${projectId}`, label: 'radia' },
+        { type: 'fiber', url: `/api/map/fibers?projectId=${projectId}`, label: 'światłowody' }
+    ];
+    const results = await Promise.all(collections.map(async collection => {
+        try {
+            const response = await fetch(collection.url);
+            await ensureResponseOk(response, `Pobieranie ${collection.label}`);
+            const data = await response.json();
+            if (!Array.isArray(data)) {
+                throw new Error(`Serwer zwrócił nieprawidłową listę: ${collection.label}`);
+            }
+            return { ...collection, data, error: null };
+        } catch (error) {
+            console.error(`Nie udało się pobrać ${collection.label}:`, error);
+            return { ...collection, data: [], error };
         }
+    }));
 
-        const camsData = await camsRes.json();
-        const radiosData = await radiosRes.json();
-        const fibsData = await fibsRes.json();
-        if (!Array.isArray(camsData) || !Array.isArray(radiosData) || !Array.isArray(fibsData)) {
-            throw new Error('Serwer zwrócił nieprawidłowe dane mapy.');
+    let cameraCount = 0;
+    let radioCount = 0;
+    let fiberCount = 0;
+    results.forEach(({ type, data }) => {
+        if (type === 'camera') {
+            data.forEach(camera => {
+                try {
+                    if (addCameraToMap(camera, false)) cameraCount++;
+                } catch (error) {
+                    console.error('Nie udało się wyświetlić kamery:', camera?.id, error);
+                }
+            });
+        } else if (type === 'radio') {
+            data.forEach(radio => {
+                try {
+                    if (addDeviceToMap('radio', radio, false)) radioCount++;
+                } catch (error) {
+                    console.error('Nie udało się wyświetlić radia:', radio?.id, error);
+                }
+            });
+        } else {
+            data.forEach(fiber => {
+                try {
+                    if (addFiberToMap(fiber, false)) fiberCount++;
+                } catch (error) {
+                    console.error('Nie udało się wyświetlić światłowodu:', fiber?.id, error);
+                }
+            });
         }
+    });
 
-        let cameraCount = 0;
-        camsData.forEach(camera => {
-            try {
-                if (addCameraToMap(camera, false)) cameraCount++;
-            } catch (error) {
-                console.error('Nie udało się wyświetlić kamery:', camera?.id, error);
-            }
-        });
-        let radioCount = 0;
-        radiosData.forEach(radio => {
-            try {
-                if (addDeviceToMap('radio', radio, false)) radioCount++;
-            } catch (error) {
-                console.error('Nie udało się wyświetlić radia:', radio?.id, error);
-            }
-        });
-        let fiberCount = 0;
-        fibsData.forEach(fiber => {
-            try {
-                if (addFiberToMap(fiber, false)) fiberCount++;
-            } catch (error) {
-                console.error('Nie udało się wyświetlić światłowodu:', fiber?.id, error);
-            }
-        });
-
-        renderCamerasList();
-        renderRadiosList();
-        renderFibersList();
-        updateFiberToolStates();
+    renderCamerasList();
+    renderRadiosList();
+    renderFibersList();
+    updateFiberToolStates();
+    const failedCollections = results.filter(result => result.error).map(result => result.label);
+    if (failedCollections.length) {
+        setStatus(`Nie udało się pobrać: ${failedCollections.join(', ')}. Pozostałe warstwy załadowano.`, 6000);
+    } else {
         setStatus(`Załadowano: ${cameraCount} kamer, ${radioCount} urządzeń radiowych, ${fiberCount} światłowodów`, 3000);
-    } catch (err) {
-        console.error('Błąd ładowania danych:', err);
-        setStatus('Błąd ładowania danych z bazy', 4000);
     }
 }
 
@@ -465,11 +474,26 @@ function openDeviceDetailsDialog(mode, type, latlng, id) {
     const title  = document.getElementById('camera-dialog-title');
     const nameIn = document.getElementById('cam-name');
     const descIn = document.getElementById('cam-desc');
+    const nameLabel = document.getElementById('device-name-label');
+    const descriptionLabel = document.getElementById('device-description-label');
+    const photoLabel = document.getElementById('device-photo-label');
+    const photoUploadLabel = document.getElementById('device-photo-upload-label');
+    const photoPlaceholder = document.getElementById('cam-photo-placeholder');
+    const photoClearButton = document.getElementById('cam-photo-clear');
     const latEl  = document.getElementById('cam-lat-display');
     const lngEl  = document.getElementById('cam-lng-display');
     const preview = document.getElementById('cam-photo-preview');
     const placeholder = document.getElementById('cam-photo-placeholder');
     const deleteBtn = document.getElementById('cam-delete-btn');
+    const lowerLabel = label.toLowerCase();
+    nameLabel.textContent = `Nazwa ${lowerLabel}`;
+    nameIn.placeholder = `Nazwa ${lowerLabel}`;
+    descriptionLabel.textContent = `Opis ${lowerLabel}`;
+    descIn.placeholder = `Opis / lokalizacja ${lowerLabel}...`;
+    photoLabel.textContent = `Zdjęcie ${lowerLabel}`;
+    photoUploadLabel.innerHTML = '<i class="fa-solid fa-upload" aria-hidden="true"></i> Wybierz plik';
+    photoPlaceholder.innerHTML = '<i class="fa-solid fa-image" style="font-size:1.5rem;margin-bottom:6px;"></i><br>Brak zdjęcia';
+    photoClearButton.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i> Usuń zdjęcie';
 
     // Reset photo
     preview.classList.add('hidden');
@@ -1335,7 +1359,14 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
-        document.getElementById(btn.dataset.tab).classList.add('active');
+        const panel = document.getElementById(btn.dataset.tab);
+        panel.classList.add('active');
+        const panelTitle = panel.querySelector('.panel-title');
+        if (panelTitle) {
+            panelTitle.textContent = btn.dataset.tab === 'radios-tab'
+                ? 'Radia'
+                : btn.dataset.tab === 'cameras-tab' ? 'Kamery' : 'Światłowody';
+        }
     });
 });
 

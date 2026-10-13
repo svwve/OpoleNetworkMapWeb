@@ -151,22 +151,22 @@
             </div>
             <div class="dialog-body">
                 <div class="form-group">
-                    <label for="cam-name">Nazwa</label>
+                    <label id="device-name-label" for="cam-name">Nazwa</label>
                     <input type="text" id="cam-name" required maxlength="255" placeholder="Nazwa kamery">
                 </div>
                 <div class="form-group">
-                    <label for="cam-desc">Opis</label>
+                    <label id="device-description-label" for="cam-desc">Opis</label>
                     <textarea id="cam-desc" rows="3" maxlength="2000" placeholder="Opis / lokalizacja..."></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Zdjęcie</label>
+                    <label id="device-photo-label">Zdjęcie kamery</label>
                     <div class="photo-area">
                         <img id="cam-photo-preview" class="photo-preview hidden" alt="Podgląd zdjęcia kamery">
                         <div id="cam-photo-placeholder" class="photo-placeholder">
                             <i class="fa-solid fa-image" style="font-size:1.5rem;margin-bottom:6px;"></i><br>Brak zdjęcia
                         </div>
                         <div class="photo-buttons">
-                            <label for="cam-photo-input" class="btn-secondary btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                            <label id="device-photo-upload-label" for="cam-photo-input" class="btn-secondary btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
                                 <i class="fa-solid fa-upload"></i> Wybierz plik
                             </label>
                             <input type="file" id="cam-photo-input" accept="image/png,image/jpeg,image/webp" class="hidden">
