@@ -1,4 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
+    if (localStorage.getItem('username') && document.getElementById('login-form')) {
+        window.location.replace('map.html?projectId=1');
+        return;
+    }
 
     // ── Logowanie ─────────────────────────────────────────────────────────────
     const loginForm = document.getElementById('login-form');
@@ -18,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (ok && data.success) {
                     localStorage.setItem('username', data.username);
                     localStorage.setItem('role', data.role);
-                    window.location.href = 'map.html?projectId=1';
+                    window.location.replace('map.html?projectId=1');
                 } else {
                     showError(data.message || 'Błąd logowania');
                 }

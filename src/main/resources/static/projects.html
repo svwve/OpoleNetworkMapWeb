@@ -54,21 +54,11 @@
     <script src="js/app.js"></script>
     <script>
         const username = localStorage.getItem('username');
-        const role     = localStorage.getItem('role');
-        const isAdmin  = role === 'ADMIN';
 
         if (!username) {
             window.location.href = 'index.html';
         } else {
-            document.getElementById('user-greeting').textContent = 'Witaj, ' + username;
-
-            if (isAdmin) {
-                const badge = document.getElementById('role-badge');
-                badge.textContent = 'Admin';
-                badge.classList.remove('hidden');
-            }
-
-            loadProjects();
+            window.location.replace('map.html?projectId=1');
         }
     </script>
 </body>

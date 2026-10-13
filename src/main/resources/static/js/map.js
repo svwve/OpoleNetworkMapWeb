@@ -43,6 +43,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 // Kamery
 const cameras = {};          // id -> { data, marker, visible }
+const radios = {};           // id -> { data, marker, visible }
 
 // Światłowody
 const fibers  = {};          // id -> { data, polyline, visible }
@@ -58,8 +59,9 @@ let fiberUndoStack  = {};    // id -> [ [points...], [points...], ... ]
 
 // Dialog – stan
 let cameraDialogMode = 'add'; // 'add' | 'edit'
+let dialogDeviceType = 'camera';
 let pendingCameraLatLng = null;
-let editingCameraId = null;
+let editingDeviceId = null;
 let pendingCameraBase64 = null;
 let existingCameraBase64 = null;
 
@@ -165,18 +167,20 @@ function pushUndo(fiberId, points) {
 
 async function loadProjectDataFromDatabase() {
     try {
-        const [camsRes, fibsRes] = await Promise.all([
+        const [camsRes, radiosRes, fibsRes] = await Promise.all([
             fetch(`/api/map/cameras?projectId=${projectId}`),
+            fetch(`/api/map/radios?projectId=${projectId}`),
             fetch(`/api/map/fibers?projectId=${projectId}`)
         ]);
 
-        if (!camsRes.ok || !fibsRes.ok) {
-            throw new Error(`Błąd pobierania danych (kamery: ${camsRes.status}, światłowody: ${fibsRes.status})`);
+        if (!camsRes.ok || !radiosRes.ok || !fibsRes.ok) {
+            throw new Error(`Błąd pobierania danych (kamery: ${camsRes.status}, radia: ${radiosRes.status}, światłowody: ${fibsRes.status})`);
         }
 
         const camsData = await camsRes.json();
+        const radiosData = await radiosRes.json();
         const fibsData = await fibsRes.json();
-        if (!Array.isArray(camsData) || !Array.isArray(fibsData)) {
+        if (!Array.isArray(camsData) || !Array.isArray(radiosData) || !Array.isArray(fibsData)) {
             throw new Error('Serwer zwrócił nieprawidłowe dane mapy.');
         }
 
@@ -186,6 +190,14 @@ async function loadProjectDataFromDatabase() {
                 if (addCameraToMap(camera, false)) cameraCount++;
             } catch (error) {
                 console.error('Nie udało się wyświetlić kamery:', camera?.id, error);
+            }
+        });
+        let radioCount = 0;
+        radiosData.forEach(radio => {
+            try {
+                if (addDeviceToMap('radio', radio, false)) radioCount++;
+            } catch (error) {
+                console.error('Nie udało się wyświetlić radia:', radio?.id, error);
             }
         });
         let fiberCount = 0;
@@ -198,9 +210,10 @@ async function loadProjectDataFromDatabase() {
         });
 
         renderCamerasList();
+        renderRadiosList();
         renderFibersList();
         updateFiberToolStates();
-        setStatus(`Załadowano: ${cameraCount} kamer, ${fiberCount} światłowodów`, 3000);
+        setStatus(`Załadowano: ${cameraCount} kamer, ${radioCount} urządzeń radiowych, ${fiberCount} światłowodów`, 3000);
     } catch (err) {
         console.error('Błąd ładowania danych:', err);
         setStatus('Błąd ładowania danych z bazy', 4000);
@@ -211,54 +224,81 @@ async function loadProjectDataFromDatabase() {
 // 5. KAMERY – logika
 // ═══════════════════════════════════════════════════════════
 
-function createCameraIcon(visible = true) {
+function getDeviceIconSize() {
+    const zoomScale = map.getZoomScale(map.getZoom(), 13);
+    return Math.round(28 * Math.max(0.55, Math.min(1, zoomScale)));
+}
+
+function createDeviceIcon(type, visible = true) {
+    const size = getDeviceIconSize();
+    const icon = type === 'radio' ? 'fa-tower-broadcast' : 'fa-camera';
+    const deviceClass = type === 'radio' ? 'radio-icon-div' : '';
     return L.divIcon({
         className: '',
-        html: `<div class="camera-icon-div${visible ? '' : ' hidden-marker'}"><i class="fa-solid fa-camera" aria-hidden="true"></i></div>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-        popupAnchor: [0, -16]
+        html: `<div class="camera-icon-div ${deviceClass}${visible ? '' : ' hidden-marker'}" style="--device-icon-size:${size}px;--device-icon-font-size:${Math.round(size / 2)}px"><i class="fa-solid ${icon}" aria-hidden="true"></i></div>`,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        popupAnchor: [0, -Math.round(size * 0.57)]
     });
 }
 
+function createCameraIcon(visible = true) {
+    return createDeviceIcon('camera', visible);
+}
+
 function addCameraToMap(data, render = true) {
+    return addDeviceToMap('camera', data, render);
+}
+
+function addDeviceToMap(type, data, render = true) {
     if (!data || data.id === null || data.id === undefined) {
-        console.error('Pominięto kamerę bez identyfikatora.');
+        console.error(`Pominięto ${type === 'radio' ? 'radio' : 'kamerę'} bez identyfikatora.`);
         return false;
     }
 
     const coordinates = getCameraCoordinates(data);
     if (!coordinates) {
-        console.error('Pominięto kamerę z nieprawidłowymi współrzędnymi:', data.id);
+        console.error(`Pominięto ${type === 'radio' ? 'radio' : 'kamerę'} z nieprawidłowymi współrzędnymi:`, data.id);
         return false;
     }
 
     data.lat = coordinates.lat;
     data.lng = coordinates.lng;
     const visible = data.isVisible !== false;
+    const collection = type === 'radio' ? radios : cameras;
     const marker = L.marker([coordinates.lat, coordinates.lng], {
-        icon: createCameraIcon(visible)
+        icon: createDeviceIcon(type, visible)
     }).addTo(map);
 
-    marker.on('click', () => openCameraDetailsDialog('edit', null, data.id));
+    marker.on('click', () => openDeviceDetailsDialog('edit', type, null, data.id));
 
-    cameras[data.id] = { data, marker, visible };
-    if (render) renderCamerasList();
+    collection[data.id] = { data, marker, visible };
+    if (render) renderDeviceList(type);
     return true;
 }
 
 function renderCamerasList() {
-    const list = document.getElementById('cameras-list');
+    renderDeviceList('camera');
+}
+
+function renderRadiosList() {
+    renderDeviceList('radio');
+}
+
+function renderDeviceList(type) {
+    const collection = type === 'radio' ? radios : cameras;
+    const deviceName = type === 'radio' ? 'Radio' : 'Kamera';
+    const list = document.getElementById(type === 'radio' ? 'radios-list' : 'cameras-list');
     list.replaceChildren();
-    Object.values(cameras).forEach(({ data, visible }) => {
+    Object.values(collection).forEach(({ data, visible }) => {
         const item = document.createElement('div');
         item.className = 'element-item';
         item.dataset.id = data.id;
 
-        const name = data.name || `Kamera #${data.id}`;
+        const name = data.name || `${deviceName} #${data.id}`;
         const color = document.createElement('div');
         color.className = 'item-color';
-        color.style.backgroundColor = '#2563eb';
+        color.style.backgroundColor = type === 'radio' ? '#7c3aed' : '#2563eb';
         const label = document.createElement('span');
         label.className = 'item-name';
         label.title = name;
@@ -275,7 +315,7 @@ function renderCamerasList() {
         actions.appendChild(visibilityButton);
         if (isAdmin) {
             const editButton = document.createElement('button');
-            editButton.className = 'vis-btn edit-cam-btn';
+            editButton.className = `vis-btn edit-${type}-btn`;
             editButton.dataset.id = data.id;
             editButton.title = 'Edytuj';
             editButton.textContent = '✏️';
@@ -285,16 +325,16 @@ function renderCamerasList() {
 
         visibilityButton.addEventListener('click', e => {
             e.stopPropagation();
-            toggleCameraVisibility(data.id);
+            toggleDeviceVisibility(type, data.id);
         });
         item.addEventListener('click', () => {
             map.panTo([data.lat, data.lng]);
-            highlightCamera(data.id);
+            highlightDevice(type, data.id);
         });
         if (isAdmin) {
-            item.querySelector('.edit-cam-btn').addEventListener('click', e => {
+            item.querySelector(`.edit-${type}-btn`).addEventListener('click', e => {
                 e.stopPropagation();
-                openCameraDetailsDialog('edit', null, data.id);
+                openDeviceDetailsDialog('edit', type, null, data.id);
             });
         }
         list.appendChild(item);
@@ -302,85 +342,124 @@ function renderCamerasList() {
 }
 
 function highlightCamera(id) {
-    document.querySelectorAll('#cameras-list .element-item').forEach(el => el.classList.remove('highlighted'));
-    const el = document.querySelector(`#cameras-list .element-item[data-id="${id}"]`);
+    highlightDevice('camera', id);
+}
+
+function highlightDevice(type, id) {
+    const listId = type === 'radio' ? 'radios-list' : 'cameras-list';
+    document.querySelectorAll(`#${listId} .element-item`).forEach(el => el.classList.remove('highlighted'));
+    const el = document.querySelector(`#${listId} .element-item[data-id="${id}"]`);
     if (el) el.classList.add('highlighted');
 }
 
 function toggleCameraVisibility(id) {
-    const cam = cameras[id];
-    if (!cam) return;
-    const previousVisible = cam.visible;
-    cam.visible = !cam.visible;
-    cam.data.isVisible = cam.visible;
-    cam.marker.setIcon(createCameraIcon(cam.visible));
-    renderCamerasList();
-    if (isAdmin) persistCameraVisibility(id, previousVisible);
+    toggleDeviceVisibility('camera', id);
+}
+
+function toggleDeviceVisibility(type, id) {
+    const collection = type === 'radio' ? radios : cameras;
+    const device = collection[id];
+    if (!device) return;
+    const previousVisible = device.visible;
+    device.visible = !device.visible;
+    device.data.isVisible = device.visible;
+    device.marker.setIcon(createDeviceIcon(type, device.visible));
+    renderDeviceList(type);
+    if (isAdmin) persistDeviceVisibility(type, id, previousVisible);
 }
 
 function showAllCameras() {
-    Object.keys(cameras).forEach(id => {
-        const cam = cameras[id];
-        const previousVisible = cam.visible;
-        cam.visible = true;
-        cam.data.isVisible = true;
-        cam.marker.setIcon(createCameraIcon(true));
-        if (isAdmin && !previousVisible) persistCameraVisibility(id, previousVisible);
-    });
-    renderCamerasList();
+    setAllDevicesVisible('camera', true);
 }
 
 function hideAllCameras() {
-    Object.keys(cameras).forEach(id => {
-        const cam = cameras[id];
-        const previousVisible = cam.visible;
-        cam.visible = false;
-        cam.data.isVisible = false;
-        cam.marker.setIcon(createCameraIcon(false));
-        if (isAdmin && previousVisible) persistCameraVisibility(id, previousVisible);
-    });
-    renderCamerasList();
+    setAllDevicesVisible('camera', false);
 }
 
-async function persistCameraVisibility(id, previousVisible) {
-    const cam = cameras[id];
-    if (!cam) return;
+function showAllRadios() {
+    setAllDevicesVisible('radio', true);
+}
+
+function hideAllRadios() {
+    setAllDevicesVisible('radio', false);
+}
+
+function setAllDevicesVisible(type, visible) {
+    const collection = type === 'radio' ? radios : cameras;
+    Object.entries(collection).forEach(([id, device]) => {
+        const previousVisible = device.visible;
+        device.visible = visible;
+        device.data.isVisible = visible;
+        device.marker.setIcon(createDeviceIcon(type, visible));
+        if (isAdmin && previousVisible !== visible) persistDeviceVisibility(type, id, previousVisible);
+    });
+    renderDeviceList(type);
+}
+
+async function persistDeviceVisibility(type, id, previousVisible) {
+    const collection = type === 'radio' ? radios : cameras;
+    const device = collection[id];
+    if (!device) return;
     try {
-        const response = await fetch(`/api/map/cameras/${id}`, {
+        const response = await fetch(`/api/map/${type === 'radio' ? 'radios' : 'cameras'}/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(cam.data)
+            body: JSON.stringify(device.data)
         });
-        await ensureResponseOk(response, 'Aktualizacja widoczności kamery');
-        cam.data = await response.json();
+        await ensureResponseOk(response, `Aktualizacja widoczności ${type === 'radio' ? 'radia' : 'kamery'}`);
+        device.data = await response.json();
     } catch (error) {
-        console.error('Nie udało się zapisać widoczności kamery:', error);
-        cam.visible = previousVisible;
-        cam.data.isVisible = previousVisible;
-        cam.marker.setIcon(createCameraIcon(previousVisible));
-        renderCamerasList();
-        setStatus('Nie udało się zapisać widoczności kamery', 3000);
+        const label = type === 'radio' ? 'radia' : 'kamery';
+        console.error(`Nie udało się zapisać widoczności ${label}:`, error);
+        device.visible = previousVisible;
+        device.data.isVisible = previousVisible;
+        device.marker.setIcon(createDeviceIcon(type, previousVisible));
+        renderDeviceList(type);
+        setStatus(`Nie udało się zapisać widoczności ${label}`, 3000);
     }
 }
+
+function refreshDeviceIconSizes() {
+    Object.values(cameras).forEach(device => device.marker.setIcon(createDeviceIcon('camera', device.visible)));
+    Object.values(radios).forEach(device => device.marker.setIcon(createDeviceIcon('radio', device.visible)));
+}
+
+map.on('zoomend', refreshDeviceIconSizes);
 
 // ── Tryb dodawania kamery ──────────────────────────────────
 
 function handleAddCamera() {
+    handleAddDevice('camera');
+}
+
+function handleAddRadio() {
+    handleAddDevice('radio');
+}
+
+function handleAddDevice(type) {
     if (!isAdmin) return;
-    if (activeMode === 'add-camera') { exitMode(); return; }
+    const mode = `add-${type}`;
+    if (activeMode === mode) { exitMode(); return; }
     exitMode();
-    activeMode = 'add-camera';
+    activeMode = mode;
     setCursor('crosshair');
-    setStatus('Kliknij na mapę, aby dodać kamerę', 0);
-    document.getElementById('btn-add-camera').classList.add('active');
+    setStatus(`Kliknij na mapę, aby dodać ${type === 'radio' ? 'radio' : 'kamerę'}`, 0);
+    document.getElementById(`btn-add-${type}`).classList.add('active');
 }
 
 // ── Dialog szczegółów kamery ───────────────────────────────
 
 function openCameraDetailsDialog(mode, latlng, id) {
+    openDeviceDetailsDialog(mode, 'camera', latlng, id);
+}
+
+function openDeviceDetailsDialog(mode, type, latlng, id) {
     cameraDialogMode = mode;
+    dialogDeviceType = type;
     pendingCameraBase64 = null;
     existingCameraBase64 = null;
+    const collection = type === 'radio' ? radios : cameras;
+    const label = type === 'radio' ? 'Radio' : 'Kamera';
 
     const dialog = document.getElementById('camera-dialog');
     const title  = document.getElementById('camera-dialog-title');
@@ -398,24 +477,27 @@ function openCameraDetailsDialog(mode, latlng, id) {
     placeholder.classList.remove('hidden');
 
     if (mode === 'add') {
-        title.textContent = 'Nowa kamera';
+        title.textContent = `Nowe urządzenie — ${label.toLowerCase()}`;
         nameIn.value = '';
         descIn.value = '';
         pendingCameraLatLng = latlng;
         latEl.textContent = latlng.lat.toFixed(6);
         lngEl.textContent = latlng.lng.toFixed(6);
-        editingCameraId = null;
+        editingDeviceId = null;
         deleteBtn.classList.add('hidden');
     } else {
-        title.textContent = 'Szczegóły kamery';
-        const cam = cameras[id];
-        if (!cam) return;
-        nameIn.value = cam.data.name || '';
-        descIn.value = cam.data.description || '';
-        latEl.textContent = cam.data.lat.toFixed(6);
-        lngEl.textContent = cam.data.lng.toFixed(6);
-        editingCameraId = id;
-        existingCameraBase64 = cam.data.photoBase64 || null;
+        const device = collection[id];
+        if (!device) {
+            setStatus(`Nie znaleziono: ${label.toLowerCase()}`, 3000);
+            return;
+        }
+        title.textContent = `Szczegóły — ${label.toLowerCase()}`;
+        nameIn.value = device.data.name || '';
+        descIn.value = device.data.description || '';
+        latEl.textContent = Number(device.data.lat).toFixed(6);
+        lngEl.textContent = Number(device.data.lng).toFixed(6);
+        editingDeviceId = id;
+        existingCameraBase64 = device.data.photoBase64 || null;
         if (existingCameraBase64) {
             preview.src = existingCameraBase64;
             preview.classList.remove('hidden');
@@ -425,21 +507,31 @@ function openCameraDetailsDialog(mode, latlng, id) {
         else deleteBtn.classList.add('hidden');
     }
 
+    deleteBtn.textContent = `Usuń ${label.toLowerCase()}`;
+    preview.alt = `Podgląd zdjęcia: ${label.toLowerCase()}`;
     document.getElementById('cam-photo-input').value = '';
     dialog.classList.remove('hidden');
 }
 
 function closeCameraDialog() {
     document.getElementById('camera-dialog').classList.add('hidden');
+    pendingCameraLatLng = null;
+    pendingCameraBase64 = null;
+    existingCameraBase64 = null;
+    editingDeviceId = null;
 }
 
 async function saveCameraDialog() {
     const name  = document.getElementById('cam-name').value.trim();
     const desc  = document.getElementById('cam-desc').value.trim();
     const photo = pendingCameraBase64 || existingCameraBase64 || null;
+    const type = dialogDeviceType;
+    const typeName = type === 'radio' ? 'radia' : 'kamery';
+    const collection = type === 'radio' ? radios : cameras;
+    const resource = type === 'radio' ? 'radios' : 'cameras';
 
     if (!name) {
-        setStatus('Podaj nazwę kamery', 3000);
+        setStatus(`Podaj nazwę ${typeName}`, 3000);
         document.getElementById('cam-name').focus();
         return;
     }
@@ -459,67 +551,75 @@ async function saveCameraDialog() {
             isVisible: true
         };
         try {
-            const res = await fetch('/api/map/cameras', {
+            const res = await fetch(`/api/map/${resource}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
             if (!res.ok) {
                 const txt = await res.text();
-                console.error('Błąd serwera (kamera POST):', res.status, txt);
-                setStatus(`Nie udało się zapisać kamery (HTTP ${res.status})`, 3000);
+                console.error(`Błąd serwera (${typeName} POST):`, res.status, txt);
+                setStatus(`Nie udało się zapisać ${typeName} (HTTP ${res.status})`, 3000);
                 return;
             }
             const saved = await res.json();
-            addCameraToMap(saved);
+            addDeviceToMap(type, saved);
             closeCameraDialog();
-            setStatus('Kamera dodana', 2500);
+            setStatus(`${type === 'radio' ? 'Radio dodane' : 'Kamera dodana'}`, 2500);
         } catch (e) {
-            console.error('Błąd zapisu kamery:', e);
-            setStatus('Błąd zapisu kamery', 3000);
+            console.error(`Błąd zapisu ${typeName}:`, e);
+            setStatus(`Błąd zapisu ${typeName}`, 3000);
         }
     } else {
-        const cam = cameras[editingCameraId];
-        if (!cam) return;
-        const previousData = { ...cam.data };
-        cam.data.name = name;
-        cam.data.description = desc || null;
-        cam.data.photoBase64 = photo;
+        const device = collection[editingDeviceId];
+        if (!device) return;
+        const previousData = { ...device.data };
+        device.data.name = name;
+        device.data.description = desc || null;
+        device.data.photoBase64 = photo;
 
         try {
-            const res = await fetch(`/api/map/cameras/${editingCameraId}`, {
+            const res = await fetch(`/api/map/${resource}/${editingDeviceId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(cam.data)
+                body: JSON.stringify(device.data)
             });
-            await ensureResponseOk(res, 'Aktualizacja kamery');
+            await ensureResponseOk(res, `Aktualizacja ${typeName}`);
             const updated = await res.json();
-            cam.data = updated;
-            renderCamerasList();
+            device.data = updated;
+            renderDeviceList(type);
             closeCameraDialog();
-            setStatus('Kamera zaktualizowana', 2500);
+            setStatus(`${type === 'radio' ? 'Radio zaktualizowane' : 'Kamera zaktualizowana'}`, 2500);
         } catch (e) {
-            cam.data = previousData;
-            renderCamerasList();
-            console.error('Błąd aktualizacji kamery:', e);
-            setStatus('Błąd aktualizacji kamery', 3000);
+            device.data = previousData;
+            renderDeviceList(type);
+            console.error(`Błąd aktualizacji ${typeName}:`, e);
+            setStatus(`Błąd aktualizacji ${typeName}`, 3000);
         }
     }
 }
 
 async function deleteCamera(id) {
-    if (!isAdmin || !confirm('Czy na pewno usunąć tę kamerę?')) return;
+    deleteDevice(dialogDeviceType, id);
+}
+
+async function deleteDevice(type, id) {
+    const collection = type === 'radio' ? radios : cameras;
+    const label = type === 'radio' ? 'radio' : 'kamerę';
+    const resource = type === 'radio' ? 'radios' : 'cameras';
+    const device = collection[id];
+    if (!isAdmin || !device || !confirm(`Czy na pewno usunąć ${label}?`)) return;
     try {
-        const response = await fetch(`/api/map/cameras/${id}`, { method: 'DELETE' });
-        await ensureResponseOk(response, 'Usuwanie kamery');
-        map.removeLayer(cameras[id].marker);
-        delete cameras[id];
+        const response = await fetch(`/api/map/${resource}/${id}`, { method: 'DELETE' });
+        await ensureResponseOk(response, `Usuwanie ${label}`);
+        map.removeLayer(device.marker);
+        delete collection[id];
         closeCameraDialog();
-        renderCamerasList();
-        setStatus('Kamera usunięta', 2500);
+        renderDeviceList(type);
+        setStatus(`${type === 'radio' ? 'Radio usunięte' : 'Kamera usunięta'}`, 2500);
     } catch (e) {
-        console.error(e);
-        setStatus('Błąd usuwania kamery', 3000);
+        console.error(`Błąd usuwania ${label}:`, e);
+        setStatus(`Błąd usuwania ${label}`, 3000);
     }
 }
 
@@ -606,7 +706,7 @@ function getFiberStrokeWeight(thickness) {
     const requestedThickness = Number(thickness);
     const baseThickness = Number.isInteger(requestedThickness) &&
         requestedThickness >= 1 && requestedThickness <= 12 ? requestedThickness : 3;
-    return baseThickness * map.getZoomScale(map.getZoom(), 13);
+    return Math.max(1, Math.min(12, baseThickness * map.getZoomScale(map.getZoom(), 13)));
 }
 
 function refreshFiberPolyline(id) {
@@ -1185,6 +1285,9 @@ map.on('click', function(e) {
     if (activeMode === 'add-camera') {
         openCameraDetailsDialog('add', e.latlng, null);
         exitMode();
+    } else if (activeMode === 'add-radio') {
+        openDeviceDetailsDialog('add', 'radio', e.latlng, null);
+        exitMode();
     } else if (activeMode === 'draw-fiber') {
         addDrawPoint(e.latlng);
     } else if (activeMode === 'append-fiber') {
@@ -1223,7 +1326,7 @@ document.getElementById('sidebar-toggle').addEventListener('click', () => {
 
 // Wróć do projektów
 document.getElementById('back-to-projects').addEventListener('click', () => {
-    window.location.href = 'projects.html';
+    window.location.href = 'map.html?projectId=1';
 });
 
 // Zakładki
@@ -1238,14 +1341,17 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 // ── Kamery ────────────────────────────────────────────────
 document.getElementById('btn-add-camera').addEventListener('click', handleAddCamera);
+document.getElementById('btn-add-radio').addEventListener('click', handleAddRadio);
 document.getElementById('show-all-cameras').addEventListener('click', showAllCameras);
 document.getElementById('hide-all-cameras').addEventListener('click', hideAllCameras);
+document.getElementById('show-all-radios').addEventListener('click', showAllRadios);
+document.getElementById('hide-all-radios').addEventListener('click', hideAllRadios);
 
 // Dialog kamery
 document.getElementById('close-camera-dialog').addEventListener('click', closeCameraDialog);
 document.getElementById('close-camera-dialog-2').addEventListener('click', closeCameraDialog);
 document.getElementById('cam-save-btn').addEventListener('click', saveCameraDialog);
-document.getElementById('cam-delete-btn').addEventListener('click', () => deleteCamera(editingCameraId));
+document.getElementById('cam-delete-btn').addEventListener('click', () => deleteCamera(editingDeviceId));
 
 // Zdjęcie
 document.getElementById('cam-photo-input').addEventListener('change', e => {
@@ -1377,6 +1483,32 @@ window.syncElements = function(type, dataArray) {
             }
         });
         renderCamerasList();
+    } else if (type === 'radios') {
+        dataArray.forEach(radio => {
+            try {
+                if (!radio || radio.id === null || radio.id === undefined) return;
+                const existing = radios[radio.id];
+                const data = existing ? { ...existing.data, ...radio } : { ...radio };
+                const coordinates = getCameraCoordinates(data);
+                if (!coordinates) {
+                    console.error('Pominięto synchronizację radia z nieprawidłowymi współrzędnymi:', radio.id);
+                    return;
+                }
+                data.lat = coordinates.lat;
+                data.lng = coordinates.lng;
+                if (existing) {
+                    existing.data = data;
+                    existing.visible = data.isVisible !== false;
+                    existing.marker.setLatLng([coordinates.lat, coordinates.lng]);
+                    existing.marker.setIcon(createDeviceIcon('radio', existing.visible));
+                } else {
+                    addDeviceToMap('radio', data, false);
+                }
+            } catch (error) {
+                console.error('Nie udało się zsynchronizować radia:', radio?.id, error);
+            }
+        });
+        renderRadiosList();
     } else if (type === 'fibers') {
         dataArray.forEach(f => {
             try {

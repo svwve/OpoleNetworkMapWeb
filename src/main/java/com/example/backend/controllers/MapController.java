@@ -2,9 +2,11 @@ package com.example.backend.controllers;
 
 import com.example.model.Camera;
 import com.example.model.Fiber;
+import com.example.model.Radio;
 import com.example.repository.CameraRepository;
 import com.example.repository.FiberRepository;
 import com.example.repository.ProjectRepository;
+import com.example.repository.RadioRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
@@ -24,14 +26,17 @@ import java.util.Map;
 public class MapController {
 
     private final CameraRepository cameraRepository;
+    private final RadioRepository radioRepository;
     private final FiberRepository fiberRepository;
     private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper;
 
     @Autowired
-    public MapController(CameraRepository cameraRepository, FiberRepository fiberRepository,
+    public MapController(CameraRepository cameraRepository, RadioRepository radioRepository,
+                         FiberRepository fiberRepository,
                          ProjectRepository projectRepository, ObjectMapper objectMapper) {
         this.cameraRepository = cameraRepository;
+        this.radioRepository = radioRepository;
         this.fiberRepository = fiberRepository;
         this.projectRepository = projectRepository;
         this.objectMapper = objectMapper;
@@ -93,6 +98,67 @@ public class MapController {
     public ResponseEntity<?> deleteCamera(@PathVariable @Positive Long id) {
         if (cameraRepository.existsById(id)) {
             cameraRepository.deleteById(id);
+            return ResponseEntity.ok(Map.of("success", true));
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    // ── Radios ───────────────────────────────────────────────────────────────
+
+    @GetMapping("/radios")
+    public ResponseEntity<List<Radio>> getRadios(
+            @RequestParam(required = false) @Positive Long projectId) {
+        if (projectId != null) {
+            return ResponseEntity.ok(radioRepository.findByProjectId(projectId));
+        }
+        return ResponseEntity.ok(radioRepository.findAll());
+    }
+
+    @GetMapping("/radios/{id}")
+    public ResponseEntity<Radio> getRadio(@PathVariable @Positive Long id) {
+        return radioRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/radios")
+    public ResponseEntity<?> addRadio(@Valid @RequestBody RadioRequest request) {
+        if (!projectRepository.existsById(request.projectId())) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Wybrany projekt nie istnieje."));
+        }
+        Radio radio = new Radio();
+        radio.setProjectId(request.projectId());
+        radio.setName(request.name().trim());
+        radio.setLat(request.lat());
+        radio.setLng(request.lng());
+        radio.setDescription(request.description());
+        radio.setPhotoBase64(request.photoBase64());
+        radio.setIsVisible(request.isVisible() == null || request.isVisible());
+        return ResponseEntity.ok(radioRepository.save(radio));
+    }
+
+    @PutMapping("/radios/{id}")
+    public ResponseEntity<?> updateRadio(@PathVariable @Positive Long id,
+                                         @Valid @RequestBody RadioRequest request) {
+        if (!projectRepository.existsById(request.projectId())) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Wybrany projekt nie istnieje."));
+        }
+        return radioRepository.findById(id).map(radio -> {
+            radio.setLat(request.lat());
+            radio.setLng(request.lng());
+            radio.setName(request.name().trim());
+            radio.setDescription(request.description());
+            radio.setPhotoBase64(request.photoBase64());
+            radio.setProjectId(request.projectId());
+            radio.setIsVisible(request.isVisible() == null || request.isVisible());
+            return ResponseEntity.ok(radioRepository.save(radio));
+        }).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/radios/{id}")
+    public ResponseEntity<?> deleteRadio(@PathVariable @Positive Long id) {
+        if (radioRepository.existsById(id)) {
+            radioRepository.deleteById(id);
             return ResponseEntity.ok(Map.of("success", true));
         }
         return ResponseEntity.notFound().build();

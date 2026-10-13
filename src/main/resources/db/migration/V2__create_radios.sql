@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS radios (
+    id BIGSERIAL PRIMARY KEY,
+    project_id BIGINT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    photo_base64 TEXT,
+    lat DOUBLE PRECISION NOT NULL,
+    lng DOUBLE PRECISION NOT NULL,
+    is_visible BOOLEAN DEFAULT TRUE
+);
