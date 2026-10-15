@@ -24,7 +24,7 @@ document.getElementById('project-name-display').textContent = 'Ładowanie projek
 
 // Mapa Leaflet
 const BASE_STYLE_ZOOM = 13;
-const map = L.map('map').setView([50.6667, 17.9222], BASE_STYLE_ZOOM);
+const map = L.map('map', { preferCanvas: true }).setView([50.6667, 17.9222], BASE_STYLE_ZOOM);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
     maxZoom: 19
@@ -321,7 +321,7 @@ async function loadProjectDataFromDatabase() {
 
 function getDeviceIconSize() {
     const zoomScale = map.getZoomScale(map.getZoom(), BASE_STYLE_ZOOM);
-    return Math.round(Math.max(8, Math.min(16, 16 * zoomScale)));
+    return Math.round(Math.max(12, Math.min(32, 16 * zoomScale)));
 }
 
 function createDeviceIcon(type, visible = true) {
@@ -776,16 +776,20 @@ function addFiberToMap(data, render = true) {
         weight: getFiberStrokeWeight(thickness),
         opacity: visible ? 1 : 0.15
     }).addTo(map);
+    polyline.bindPopup(createFiberPopupContent(data));
 
     polyline.on('click', event => {
         if (activeMode === 'select-fiber') {
+            polyline.closePopup();
             handleFiberSelected(data.id, event.latlng);
         } else if (activeMode === 'append-fiber') {
+            polyline.closePopup();
             appendRoutePoint(event.latlng);
         } else if (activeMode === 'draw-fiber') {
+            polyline.closePopup();
             addDrawPoint(event.latlng);
-        } else if (activeMode === null) {
-            openFiberDialog(data.id);
+        } else if (activeMode !== null) {
+            polyline.closePopup();
         }
     });
 
@@ -804,11 +808,22 @@ function addFiberToMap(data, render = true) {
     return true;
 }
 
+function createFiberPopupContent(data) {
+    const content = document.createElement('div');
+    const label = document.createElement('div');
+    const name = document.createElement('strong');
+    label.textContent = 'Światłowód';
+    name.textContent = data.name || `Światłowód #${data.id}`;
+    content.append(label, name);
+    return content;
+}
+
 function getFiberStrokeWeight(thickness) {
     const requestedThickness = Number(thickness);
     const baseThickness = Number.isInteger(requestedThickness) &&
         requestedThickness >= 1 && requestedThickness <= 12 ? requestedThickness : 3;
-    return Math.max(1, Math.min(2, baseThickness));
+    const zoomScale = map.getZoomScale(map.getZoom(), BASE_STYLE_ZOOM);
+    return Math.max(1, Math.min(12, baseThickness * zoomScale));
 }
 
 function refreshFiberPolyline(id) {
@@ -823,10 +838,20 @@ function refreshFiberPolyline(id) {
             weight: getFiberStrokeWeight(fb.data.thickness),
             opacity: fb.visible ? 1 : 0.15
         });
+        fb.polyline.setPopupContent(createFiberPopupContent(fb.data));
     }
 }
 
 function refreshZoomDependentStyles() {
+    Object.values(fibers).forEach(({ data, polyline }) => {
+        polyline.setStyle({ weight: getFiberStrokeWeight(data.thickness) });
+    });
+    if (fiberDrawLine) {
+        const drawingThickness = activeFiberId && fibers[activeFiberId]
+            ? fibers[activeFiberId].data.thickness
+            : 3;
+        fiberDrawLine.setStyle({ weight: getFiberStrokeWeight(drawingThickness) });
+    }
     const iconSize = getDeviceIconSize();
     const refreshDeviceIcons = (collection, type) => {
         Object.values(collection).forEach(device => {
