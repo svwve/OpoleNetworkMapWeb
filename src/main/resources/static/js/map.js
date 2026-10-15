@@ -23,7 +23,8 @@ let projectId = null;
 document.getElementById('project-name-display').textContent = 'Ładowanie projektu…';
 
 // Mapa Leaflet
-const map = L.map('map').setView([50.6667, 17.9222], 13);
+const BASE_STYLE_ZOOM = 13;
+const map = L.map('map').setView([50.6667, 17.9222], BASE_STYLE_ZOOM);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
     maxZoom: 19
@@ -319,8 +320,12 @@ async function loadProjectDataFromDatabase() {
 // ═══════════════════════════════════════════════════════════
 
 function getDeviceIconSize() {
-    const zoomScale = map.getZoomScale(map.getZoom(), 13);
-    return Math.round(28 * Math.max(0.55, Math.min(1, zoomScale)));
+    const zoomScale = getMapZoomScale();
+    return Math.round(Math.max(8, Math.min(56, 28 * zoomScale)));
+}
+
+function getMapZoomScale() {
+    return Math.pow(2, map.getZoom() - BASE_STYLE_ZOOM);
 }
 
 function createDeviceIcon(type, visible = true) {
@@ -366,7 +371,7 @@ function addDeviceToMap(type, data, render = true) {
 
     marker.on('click', () => openDeviceDetailsDialog('edit', type, null, data.id));
 
-    collection[data.id] = { data, marker, visible };
+    collection[data.id] = { data, marker, visible, iconSize: getDeviceIconSize() };
     if (render) renderDeviceList(type);
     return true;
 }
@@ -512,13 +517,6 @@ async function persistDeviceVisibility(type, id, previousVisible) {
         setStatus(`Nie udało się zapisać widoczności ${label}`, 3000);
     }
 }
-
-function refreshDeviceIconSizes() {
-    Object.values(cameras).forEach(device => device.marker.setIcon(createDeviceIcon('camera', device.visible)));
-    Object.values(radios).forEach(device => device.marker.setIcon(createDeviceIcon('radio', device.visible)));
-}
-
-map.on('zoomend', refreshDeviceIconSizes);
 
 // ── Tryb dodawania kamery ──────────────────────────────────
 
@@ -814,7 +812,7 @@ function getFiberStrokeWeight(thickness) {
     const requestedThickness = Number(thickness);
     const baseThickness = Number.isInteger(requestedThickness) &&
         requestedThickness >= 1 && requestedThickness <= 12 ? requestedThickness : 3;
-    return Math.max(1, Math.min(12, baseThickness * map.getZoomScale(map.getZoom(), 13)));
+    return Math.max(1, Math.min(12, baseThickness * getMapZoomScale()));
 }
 
 function refreshFiberPolyline(id) {
@@ -832,19 +830,32 @@ function refreshFiberPolyline(id) {
     }
 }
 
-function refreshFiberStrokeWidths() {
+function refreshZoomDependentStyles() {
+    const iconSize = getDeviceIconSize();
+    const refreshDeviceIcons = (collection, type) => {
+        Object.values(collection).forEach(device => {
+            if (device.iconSize === iconSize) return;
+            device.marker.setIcon(createDeviceIcon(type, device.visible));
+            device.iconSize = iconSize;
+        });
+    };
+    refreshDeviceIcons(cameras, 'camera');
+    refreshDeviceIcons(radios, 'radio');
+
     Object.values(fibers).forEach(({ data, polyline }) => {
-        polyline.setStyle({ weight: getFiberStrokeWeight(data.thickness) });
+        const weight = getFiberStrokeWeight(data.thickness);
+        if (polyline.options.weight !== weight) polyline.setStyle({ weight });
     });
     if (fiberDrawLine) {
         const thickness = activeFiberId && fibers[activeFiberId]
             ? fibers[activeFiberId].data.thickness
             : 3;
-        fiberDrawLine.setStyle({ weight: getFiberStrokeWeight(thickness) });
+        const weight = getFiberStrokeWeight(thickness);
+        if (fiberDrawLine.options.weight !== weight) fiberDrawLine.setStyle({ weight });
     }
 }
 
-map.on('zoomend', refreshFiberStrokeWidths);
+map.on('zoomend', refreshZoomDependentStyles);
 
 function renderFibersList() {
     const list = document.getElementById('fibers-list');
