@@ -320,12 +320,8 @@ async function loadProjectDataFromDatabase() {
 // ═══════════════════════════════════════════════════════════
 
 function getDeviceIconSize() {
-    const zoomScale = getMapZoomScale();
-    return Math.round(Math.max(8, Math.min(56, 28 * zoomScale)));
-}
-
-function getMapZoomScale() {
-    return Math.pow(2, map.getZoom() - BASE_STYLE_ZOOM);
+    const zoomScale = map.getZoomScale(map.getZoom(), BASE_STYLE_ZOOM);
+    return Math.round(Math.max(8, Math.min(16, 16 * zoomScale)));
 }
 
 function createDeviceIcon(type, visible = true) {
@@ -812,7 +808,7 @@ function getFiberStrokeWeight(thickness) {
     const requestedThickness = Number(thickness);
     const baseThickness = Number.isInteger(requestedThickness) &&
         requestedThickness >= 1 && requestedThickness <= 12 ? requestedThickness : 3;
-    return Math.max(1, Math.min(12, baseThickness * getMapZoomScale()));
+    return Math.max(1, Math.min(2, baseThickness));
 }
 
 function refreshFiberPolyline(id) {
@@ -841,18 +837,6 @@ function refreshZoomDependentStyles() {
     };
     refreshDeviceIcons(cameras, 'camera');
     refreshDeviceIcons(radios, 'radio');
-
-    Object.values(fibers).forEach(({ data, polyline }) => {
-        const weight = getFiberStrokeWeight(data.thickness);
-        if (polyline.options.weight !== weight) polyline.setStyle({ weight });
-    });
-    if (fiberDrawLine) {
-        const thickness = activeFiberId && fibers[activeFiberId]
-            ? fibers[activeFiberId].data.thickness
-            : 3;
-        const weight = getFiberStrokeWeight(thickness);
-        if (fiberDrawLine.options.weight !== weight) fiberDrawLine.setStyle({ weight });
-    }
 }
 
 map.on('zoomend', refreshZoomDependentStyles);
