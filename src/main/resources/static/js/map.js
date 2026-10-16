@@ -820,10 +820,9 @@ function createFiberPopupContent(data) {
 
 function getFiberStrokeWeight(thickness) {
     const requestedThickness = Number(thickness);
-    const baseThickness = Number.isInteger(requestedThickness) &&
+    // ZWRACAMY BEZPOŚREDNIĄ, STAŁĄ GRUBOŚĆ W PIKSELACH BEZ SKALOWANIA ZOOMEM
+    return Number.isInteger(requestedThickness) &&
         requestedThickness >= 1 && requestedThickness <= 12 ? requestedThickness : 3;
-    const zoomScale = map.getZoomScale(map.getZoom(), BASE_STYLE_ZOOM);
-    return Math.max(1, Math.min(12, baseThickness * zoomScale));
 }
 
 function refreshFiberPolyline(id) {
