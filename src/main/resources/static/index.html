@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opole Network Map - Logowanie</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body class="auth-bg">
+    <div class="auth-container glass-panel">
+        <div class="auth-header">
+            <h1>Opole Network Map</h1>
+            <p>Zaloguj się do systemu</p>
+        </div>
+        
+        <div id="error-message" class="alert hidden"></div>
+        <div id="success-message" class="alert alert-success hidden"></div>
+
+        <form id="login-form">
+            <div class="form-group">
+                <label for="username">Nazwa użytkownika</label>
+                <input type="text" id="username" name="username" required maxlength="50" placeholder="Wpisz nazwę użytkownika">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Hasło</label>
+                <input type="password" id="password" name="password" required maxlength="72" placeholder="Wpisz hasło">
+            </div>
+            
+            <button type="submit" class="btn-primary">Zaloguj się</button>
+        </form>
+
+        <div class="auth-switch">
+            Nie masz konta? <a href="#" id="show-register">Zarejestruj się</a>
+        </div>
+        
+        <form id="register-form" class="hidden">
+            <div class="form-group">
+                <label for="reg-username">Nazwa użytkownika</label>
+                <input type="text" id="reg-username" name="username" required maxlength="50" placeholder="Wybierz nazwę użytkownika">
+            </div>
+            
+            <div class="form-group">
+                <label for="reg-password">Hasło</label>
+                <input type="password" id="reg-password" name="password" required minlength="8" maxlength="72" placeholder="Utwórz hasło">
+            </div>
+            
+            <button type="submit" class="btn-primary">Utwórz konto</button>
+            <div class="auth-switch">
+                Masz już konto? <a href="#" id="show-login">Zaloguj się</a>
+            </div>
+        </form>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
