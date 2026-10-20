@@ -1117,7 +1117,7 @@ function handleAppendFromEnd() {
     document.getElementById('btn-append-fiber').classList.add('active');
 }
 
-function showFiberAppendEndpoints(id) {
+function enableFiberEndPointsSelection(id) {
     activeFiberId = id;
     const fb = fibers[id];
     if (!fb) {
@@ -1134,18 +1134,18 @@ function showFiberAppendEndpoints(id) {
 
     document.getElementById('fiber-select-overlay').classList.add('hidden');
     activeMode = 'select-fiber-end';
-    setStatus('Kliknij czerwony znacznik na początku lub końcu trasy, od którego chcesz dorysować.', 0);
+    setStatus('Kliknij kropkę na wybranym końcu światłowodu, aby od niego dorysowywać', 0);
     clearFiberAppendEndpointMarkers();
     [
         { point: pts[0], isStart: true, label: 'Początek trasy' },
         { point: pts[pts.length - 1], isStart: false, label: 'Koniec trasy' }
     ].forEach(({ point, isStart, label }) => {
         const marker = L.circleMarker(point, {
-            radius: 9,
+            radius: 11,
             color: '#ffffff',
-            fillColor: '#ef4444',
+            fillColor: '#f97316',
             fillOpacity: 1,
-            weight: 3,
+            weight: 4,
             bubblingMouseEvents: false
         }).addTo(map);
         marker.bindTooltip(label, { direction: 'top', offset: [0, -8] });
@@ -1238,7 +1238,7 @@ function handleFiberSelected(id) {
         // Sprawdź jaka akcja czeka
         const pendingAction = document.querySelector('.tool-btn.active')?.id;
         if (pendingAction === 'btn-append-fiber') {
-            showFiberAppendEndpoints(id);
+            enableFiberEndPointsSelection(id);
         } else if (pendingAction === 'btn-vertex-delete') {
             enableVertexDeletion(id);
         } else if (pendingAction === 'btn-edit-fiber') {
