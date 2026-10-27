@@ -15,14 +15,15 @@
         <div class="nav-user">
             <span id="user-greeting">Witaj, Użytkowniku</span>
             <span id="role-badge" class="role-badge hidden"></span>
+            <a id="admin-link" class="btn-secondary btn-sm hidden" href="admin.html">Użytkownicy</a>
             <button id="logout-btn" class="btn-secondary btn-sm">Wyloguj</button>
         </div>
     </nav>
 
     <div class="container">
         <div class="header-action">
-            <h2>Twoje Projekty</h2>
-            <button id="new-project-btn" class="btn-primary">+ Nowy Projekt</button>
+            <h2>Projekty</h2>
+            <button id="new-project-btn" class="btn-primary admin-only hidden">+ Nowy Projekt</button>
         </div>
 
         <div id="new-project-form" class="glass-panel hidden mb-4">
@@ -64,7 +65,15 @@
                 }
                 localStorage.setItem('username', session.username);
                 localStorage.setItem('role', session.role);
-                window.location.replace('map.html');
+                document.getElementById('admin-link').classList.toggle('hidden', session.role !== 'ADMIN');
+                document.getElementById('user-greeting').textContent = `Witaj, ${session.username}`;
+                const roleBadge = document.getElementById('role-badge');
+                roleBadge.textContent = session.role === 'ADMIN' ? 'Administrator' : 'Operator';
+                roleBadge.classList.remove('hidden');
+                document.querySelectorAll('.admin-only').forEach(element => {
+                    element.classList.toggle('hidden', session.role !== 'ADMIN');
+                });
+                loadProjects();
             })
             .catch(error => {
                 console.error('Nie udało się sprawdzić sesji:', error);

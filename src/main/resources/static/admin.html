@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opole Network Map - Administrator</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="dashboard-bg">
+    <nav class="navbar glass-panel">
+        <div class="nav-brand">Opole Network Map — administracja</div>
+        <div class="nav-user">
+            <a class="btn-secondary btn-sm" href="map.html">Powrót do mapy</a>
+            <button id="logout-btn" class="btn-secondary btn-sm">Wyloguj</button>
+        </div>
+    </nav>
+    <main class="container">
+        <h2>Użytkownicy oczekujący na zatwierdzenie</h2>
+        <div id="pending-users" class="projects-grid" aria-live="polite">
+            <div class="loading">Ładowanie użytkowników...</div>
+        </div>
+        <div id="admin-error" class="alert hidden" role="alert"></div>
+    </main>
+    <script src="js/app.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>

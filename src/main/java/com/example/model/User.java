@@ -35,13 +35,21 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
+    @Column(nullable = false)
+    private boolean approved;
+
     public User() {
     }
 
     public User(String username, String passwordHash, Role role) {
+        this(username, passwordHash, role, false);
+    }
+
+    public User(String username, String passwordHash, Role role, boolean approved) {
         this.username = username;
         this.passwordHash = passwordHash;
         this.role = role;
+        this.approved = approved;
     }
 
     public Long getId() {
@@ -74,5 +82,13 @@ public class User {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public boolean isApproved() {
+        return approved;
+    }
+
+    public void setApproved(boolean approved) {
+        this.approved = approved;
     }
 }

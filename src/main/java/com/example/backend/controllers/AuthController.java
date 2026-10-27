@@ -31,6 +31,13 @@ public class AuthController {
         if (session == null || session.getAttribute("username") == null) {
             return ResponseEntity.ok(Map.of("success", false));
         }
+        if (!userService.isValidSession(
+                (String) session.getAttribute("username"),
+                session.getAttribute("userId"),
+                session.getAttribute("role"))) {
+            session.invalidate();
+            return ResponseEntity.ok(Map.of("success", false));
+        }
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "username", session.getAttribute("username"),
@@ -58,7 +65,7 @@ public class AuthController {
             request.changeSessionId();
             session.setAttribute("username", username);
             session.setAttribute("role", role.name());
-            session.setAttribute("userId", Math.toIntExact(user.getId()));
+            session.setAttribute("userId", user.getId());
             response.put("success", true);
             response.put("role", role.name());
             response.put("username", username);
@@ -83,7 +90,7 @@ public class AuthController {
         Map<String, Object> response = new HashMap<>();
         if (registered) {
             response.put("success", true);
-            response.put("message", "Zarejestrowano pomyślnie");
+            response.put("message", "Konto oczekuje na zatwierdzenie administratora.");
             return ResponseEntity.ok(response);
         } else {
             response.put("success", false);

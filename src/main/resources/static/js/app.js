@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (session.success) {
                     localStorage.setItem('username', session.username);
                     localStorage.setItem('role', session.role);
-                    window.location.replace('map.html');
+                    window.location.replace('projects.html');
                 } else {
                     localStorage.removeItem('username');
                     localStorage.removeItem('role');
@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (ok && data.success) {
                     localStorage.setItem('username', data.username);
                     localStorage.setItem('role', data.role);
-                    window.location.replace('map.html');
+                    window.location.replace('projects.html');
                 } else {
                     showError(data.message || 'Błąd logowania');
                 }
@@ -70,8 +70,8 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(async res => ({ ok: res.ok, data: await res.json() }))
             .then(({ ok, data }) => {
                 if (ok && data.success) {
-                    showSuccess('Zarejestrowano pomyślnie. Możesz się zalogować.');
                     toggleAuthForms();
+                    showSuccess('Zarejestrowano pomyślnie. Możesz się zalogować.');
                 } else {
                     showError(data.message || 'Błąd rejestracji');
                 }
@@ -97,7 +97,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error('Błąd wylogowania:', error);
             }
-            localStorage.clear();
+            localStorage.removeItem('username');
+            localStorage.removeItem('role');
             window.location.href = 'index.html';
         });
     }
@@ -232,7 +233,9 @@ window.loadProjects = function() {
             if (!Array.isArray(data)) throw new Error('Nieprawidłowa lista projektów');
             container.innerHTML = '';
             if (!data.length) {
-                container.innerHTML = '<div class="loading">Brak projektów. Utwórz nowy!</div>';
+                container.textContent = isAdmin
+                    ? 'Brak projektów. Utwórz nowy projekt.'
+                    : 'Brak dostępnych projektów.';
                 return;
             }
 

@@ -1,5 +1,6 @@
 package com.example.config;
 
+import com.example.backend.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -8,13 +9,20 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ApiSessionInterceptorTest {
 
-    private final ApiSessionInterceptor interceptor = new ApiSessionInterceptor();
+    private final UserService userService = mock(UserService.class);
+    private final ApiSessionInterceptor interceptor = new ApiSessionInterceptor(userService);
+
+    ApiSessionInterceptorTest() {
+        when(userService.isValidSession(anyString(), any(), any())).thenReturn(true);
+    }
 
     @Test
     void rejectsUnauthenticatedApiRequests() throws Exception {
@@ -23,6 +31,34 @@ class ApiSessionInterceptorTest {
 
         assertFalse(interceptor.preHandle(request, response, new Object()));
         verify(response).sendError(HttpServletResponse.SC_UNAUTHORIZED, "Zaloguj się, aby kontynuować.");
+    }
+
+    @Test
+    void redirectsUnauthenticatedRequestsForProtectedPages() throws Exception {
+        HttpServletRequest request = request("GET", "/map.html", null);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        verify(response).sendRedirect("/index.html");
+    }
+
+    @Test
+    void rejectsSessionsThatAreNoLongerApproved() throws Exception {
+        HttpServletRequest request = request("GET", "/api/projects", "OPERATOR");
+        when(userService.isValidSession("test-user", 9L, "OPERATOR")).thenReturn(false);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        verify(response).sendError(HttpServletResponse.SC_UNAUTHORIZED, "Zaloguj się, aby kontynuować.");
+    }
+
+    @Test
+    void redirectsOperatorsAwayFromTheAdminPage() throws Exception {
+        HttpServletRequest request = request("GET", "/admin.html", "OPERATOR");
+        HttpServletResponse response = mock(HttpServletResponse.class);
+
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        verify(response).sendRedirect("/projects.html");
     }
 
     @Test
@@ -107,6 +143,7 @@ class ApiSessionInterceptorTest {
             HttpSession session = mock(HttpSession.class);
             when(session.getAttribute("username")).thenReturn("test-user");
             when(session.getAttribute("role")).thenReturn(role);
+            when(session.getAttribute("userId")).thenReturn(9L);
             when(request.getSession(false)).thenReturn(session);
         }
         return request;

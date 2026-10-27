@@ -33,10 +33,30 @@ public class UserController {
                 map.put("id", user.getId());
                 map.put("username", user.getUsername());
                 map.put("role", user.getRole().name());
+                map.put("approved", user.isApproved());
                 return map;
             })
             .collect(Collectors.toList());
         return ResponseEntity.ok(users);
+    }
+
+    @GetMapping("/pending")
+    public ResponseEntity<List<Map<String, Object>>> getPendingUsers() {
+        List<Map<String, Object>> users = userService.getPendingUsers().stream()
+                .map(user -> Map.<String, Object>of(
+                        "id", user.getId(),
+                        "username", user.getUsername(),
+                        "role", user.getRole().name()))
+                .toList();
+        return ResponseEntity.ok(users);
+    }
+
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<Map<String, Object>> approveUser(@PathVariable Long id) {
+        if (userService.approveUser(id)) {
+            return ResponseEntity.ok(Map.of("success", true));
+        }
+        return ResponseEntity.notFound().build();
     }
 
     @GetMapping("/{id}")

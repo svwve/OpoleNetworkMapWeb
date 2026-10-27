@@ -41,4 +41,9 @@ public class ApiExceptionHandler {
         return ResponseEntity.badRequest().body(Map.of("error", "Nieprawidłowe dane żądania."));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalArgument() {
+        return ResponseEntity.badRequest().body(Map.of("error", "Nieprawidłowa wartość żądania."));
+    }
+
 }

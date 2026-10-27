@@ -9,10 +9,9 @@
 // ═══════════════════════════════════════════════════════════
 
 // Sprawdzenie sesji
-let _username = localStorage.getItem('username') || '';
-let _role = localStorage.getItem('role') || '';
+let _username = '';
+let _role = '';
 let isAdmin = false;
-if (!_username) { window.location.replace('index.html'); }
 
 const projectParams = new URLSearchParams(window.location.search);
 const _projectIdRaw = projectParams.get('projectId') ?? projectParams.get('id');
@@ -1513,16 +1512,9 @@ document.getElementById('sidebar-toggle').addEventListener('click', () => {
 });
 
 // Odśwież mapę
-document.getElementById('refresh-map-btn').addEventListener('click', () => {
+document.getElementById('refresh-btn').addEventListener('click', () => {
     map.invalidateSize();
     setStatus('Mapa odświeżona', 2000);
-});
-
-// Wyloguj sie 
-document.getElementById('logout-btn').addEventListener('click', () => {
-    if (confirm('Czy na pewno chcesz się wylogować?')) {
-        window.location.href = '/logout';
-    }
 });
 
 // Zakładki
