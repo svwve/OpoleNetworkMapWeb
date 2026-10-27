@@ -85,7 +85,8 @@ public class AuthController {
             ));
         }
         boolean registered = userService.registerUser(
-                request.username().trim(), request.password(), Role.OPERATOR);
+                request.username().trim(), request.password(),
+                request.role() == null ? Role.USER : Role.valueOf(request.role()));
 
         Map<String, Object> response = new HashMap<>();
         if (registered) {

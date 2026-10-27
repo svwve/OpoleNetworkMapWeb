@@ -1,9 +1,10 @@
 package com.example.backend.controllers;
 
 import com.example.backend.UserService;
+import com.example.model.Role;
+import org.junit.jupiter.api.Test;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
@@ -58,5 +59,26 @@ class AuthControllerTest {
 
         assertEquals(Boolean.FALSE, response.get("success"));
         verify(session).invalidate();
+    }
+
+    @Test
+    void registersRequestedAdminRoleAsPending() {
+        when(userService.registerUser("new-admin", "strong-password", Role.ADMIN)).thenReturn(true);
+
+        Map<String, Object> response = controller.register(
+                new RegisterRequest("new-admin", "strong-password", "ADMIN")).getBody();
+
+        assertEquals(Boolean.TRUE, response.get("success"));
+        assertEquals("Konto oczekuje na zatwierdzenie administratora.", response.get("message"));
+        verify(userService).registerUser("new-admin", "strong-password", Role.ADMIN);
+    }
+
+    @Test
+    void defaultsRegistrationWithoutRoleToUser() {
+        when(userService.registerUser("new-user", "strong-password", Role.USER)).thenReturn(true);
+
+        controller.register(new RegisterRequest("new-user", "strong-password", null));
+
+        verify(userService).registerUser("new-user", "strong-password", Role.USER);
     }
 }

@@ -75,6 +75,25 @@ public class UserService {
         return userRepository.findByApprovedFalseOrderByUsernameAsc();
     }
 
+    public List<User> getApprovedUsers() {
+        return userRepository.findAll().stream()
+                .filter(User::isApproved)
+                .toList();
+    }
+
+    public Optional<User> changeApprovedUserRole(Long id, Role role) {
+        if (role != Role.ADMIN && role != Role.USER) {
+            return Optional.empty();
+        }
+        return userRepository.findById(id)
+                .filter(User::isApproved)
+                .filter(user -> !"admin".equals(user.getUsername()) || role == Role.ADMIN)
+                .map(user -> {
+                    user.setRole(role);
+                    return userRepository.save(user);
+                });
+    }
+
     public boolean approveUser(Long id) {
         return userRepository.findById(id).map(user -> {
             user.setApproved(true);

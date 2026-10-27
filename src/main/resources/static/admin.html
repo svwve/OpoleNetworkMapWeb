@@ -10,13 +10,17 @@
     <nav class="navbar glass-panel">
         <div class="nav-brand">Opole Network Map — administracja</div>
         <div class="nav-user">
-            <a class="btn-secondary btn-sm" href="map.html">Powrót do mapy</a>
+            <a class="btn-secondary btn-sm" href="projects.html">Powrót do projektów</a>
             <button id="logout-btn" class="btn-secondary btn-sm">Wyloguj</button>
         </div>
     </nav>
     <main class="container">
         <h2>Użytkownicy oczekujący na zatwierdzenie</h2>
         <div id="pending-users" class="projects-grid" aria-live="polite">
+            <div class="loading">Ładowanie użytkowników...</div>
+        </div>
+        <h2>Aktywni użytkownicy</h2>
+        <div id="active-users" class="projects-grid" aria-live="polite">
             <div class="loading">Ładowanie użytkowników...</div>
         </div>
         <div id="admin-error" class="alert hidden" role="alert"></div>

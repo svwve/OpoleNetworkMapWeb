@@ -53,6 +53,16 @@ class ApiSessionInterceptorTest {
     }
 
     @Test
+    void restrictsAdminApiToAdministratorSessions() throws Exception {
+        HttpServletRequest request = request("GET", "/api/admin/users", "USER");
+        HttpServletResponse response = mock(HttpServletResponse.class);
+
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN,
+                "Dostęp do panelu administracyjnego wymaga uprawnień administratora.");
+    }
+
+    @Test
     void redirectsOperatorsAwayFromTheAdminPage() throws Exception {
         HttpServletRequest request = request("GET", "/admin.html", "OPERATOR");
         HttpServletResponse response = mock(HttpServletResponse.class);

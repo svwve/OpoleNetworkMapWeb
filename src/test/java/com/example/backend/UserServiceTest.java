@@ -70,4 +70,14 @@ class UserServiceTest {
         assertTrue(admin.isApproved());
         assertTrue(org.mindrot.jbcrypt.BCrypt.checkpw("admin", admin.getPasswordHash()));
     }
+
+    @Test
+    void preventsChangingTheMainAdminRole() {
+        UserService userService = new UserService(userRepository);
+        User admin = new User("admin", "hash", Role.ADMIN, true);
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(admin));
+
+        assertTrue(userService.changeApprovedUserRole(1L, Role.USER).isEmpty());
+        verify(userRepository, never()).save(admin);
+    }
 }

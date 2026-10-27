@@ -68,6 +68,13 @@ public class ApiSessionInterceptor implements HandlerInterceptor {
         if (!apiRequest) {
             return true;
         }
+        if (path.equals("/api/admin") || path.startsWith("/api/admin/")) {
+            if (!admin) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                        "Dostęp do panelu administracyjnego wymaga uprawnień administratora.");
+                return false;
+            }
+        }
         if (("/api/users".equals(path) || path.startsWith("/api/users/")) && !admin) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Dostęp do zarządzania użytkownikami wymaga uprawnień administratora.");
             return false;

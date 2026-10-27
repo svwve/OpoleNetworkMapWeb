@@ -34,6 +34,7 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
+    padding: 1.5rem 1rem;
 }
 
 .dashboard-bg {
@@ -106,7 +107,8 @@ label {
 }
 
 input[type="text"],
-input[type="password"] {
+input[type="password"],
+select {
     width: 100%;
     padding: 0.75rem 1rem;
     border: 1px solid #cbd5e1;
@@ -117,6 +119,12 @@ input[type="password"] {
 }
 
 input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+select:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);

@@ -61,17 +61,18 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const username = document.getElementById('reg-username').value;
             const password = document.getElementById('reg-password').value;
+            const role = document.getElementById('reg-role').value;
 
             apiFetch('/api/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ username, password, role })
             })
             .then(async res => ({ ok: res.ok, data: await res.json() }))
             .then(({ ok, data }) => {
                 if (ok && data.success) {
                     toggleAuthForms();
-                    showSuccess('Zarejestrowano pomyślnie. Możesz się zalogować.');
+                    showSuccess(data.message || 'Konto oczekuje na zatwierdzenie administratora.');
                 } else {
                     showError(data.message || 'Błąd rejestracji');
                 }
@@ -194,8 +195,13 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function toggleAuthForms() {
-    document.getElementById('login-form').classList.toggle('hidden');
-    document.getElementById('register-form').classList.toggle('hidden');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const showRegistration = loginForm.classList.contains('hidden');
+    loginForm.classList.toggle('hidden', !showRegistration);
+    registerForm.classList.toggle('hidden', showRegistration);
+    document.getElementById('login-switch').classList.toggle('hidden', showRegistration);
+    document.getElementById('register-switch').classList.toggle('hidden', !showRegistration);
     document.getElementById('error-message').classList.add('hidden');
     document.getElementById('success-message').classList.add('hidden');
 }

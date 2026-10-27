@@ -31,7 +31,7 @@
             <button type="submit" class="btn-primary">Zaloguj się</button>
         </form>
 
-        <div class="auth-switch">
+        <div id="login-switch" class="auth-switch">
             Nie masz konta? <a href="#" id="show-register">Zarejestruj się</a>
         </div>
         
@@ -45,9 +45,17 @@
                 <label for="reg-password">Hasło</label>
                 <input type="password" id="reg-password" name="password" required minlength="8" maxlength="72" placeholder="Utwórz hasło">
             </div>
-            
+
+            <div class="form-group">
+                <label for="reg-role">Wybierz rolę</label>
+                <select id="reg-role" name="role" required>
+                    <option value="USER">Operator</option>
+                    <option value="ADMIN">Administrator</option>
+                </select>
+            </div>
+
             <button type="submit" class="btn-primary">Utwórz konto</button>
-            <div class="auth-switch">
+            <div id="register-switch" class="auth-switch">
                 Masz już konto? <a href="#" id="show-login">Zaloguj się</a>
             </div>
         </form>
