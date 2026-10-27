@@ -1512,9 +1512,17 @@ document.getElementById('sidebar-toggle').addEventListener('click', () => {
     map.invalidateSize();
 });
 
-// Wróć do projektów
-document.getElementById('back-to-projects').addEventListener('click', () => {
-    window.location.href = 'map.html';
+// Odśwież mapę
+document.getElementById('refresh-map-btn').addEventListener('click', () => {
+    map.invalidateSize();
+    setStatus('Mapa odświeżona', 2000);
+});
+
+// Wyloguj sie 
+document.getElementById('logout-btn').addEventListener('click', () => {
+    if (confirm('Czy na pewno chcesz się wylogować?')) {
+        window.location.href = '/logout';
+    }
 });
 
 // Zakładki
