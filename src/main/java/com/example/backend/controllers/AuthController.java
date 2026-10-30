@@ -100,6 +100,23 @@ public class AuthController {
         }
     }
 
+    @PostMapping("/change-password")
+    public ResponseEntity<Map<String, Object>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request, HttpSession session) {
+        if (request.newPassword().getBytes(StandardCharsets.UTF_8).length > 72) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "Hasło może mieć maksymalnie 72 bajty UTF-8."
+            ));
+        }
+        String username = (String) session.getAttribute("username");
+        if (!userService.changePassword(username, request.currentPassword(), request.newPassword())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "Nieprawidłowe obecne hasło lub nowe hasło."
+            ));
+        }
+        return ResponseEntity.ok(Map.of("success", true, "message", "Hasło zostało zmienione."));
+    }
+
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(HttpSession session) {
         session.invalidate();

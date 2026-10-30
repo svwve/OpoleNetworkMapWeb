@@ -157,12 +157,39 @@ public class UserService {
         }).orElse(null);
     }
 
+    public boolean changePassword(String username, String currentPassword, String newPassword) {
+        if (username == null || !isUsablePassword(currentPassword)
+                || !isUsablePassword(newPassword) || newPassword.length() < 8) {
+            return false;
+        }
+
+        return userRepository.findByUsername(username)
+                .filter(User::isApproved)
+                .map(user -> {
+                    try {
+                        if (!BCrypt.checkpw(currentPassword, user.getPasswordHash())) {
+                            return false;
+                        }
+                    } catch (IllegalArgumentException exception) {
+                        logger.warn("Stored password hash is invalid for user '{}'", username);
+                        return false;
+                    }
+                    user.setPasswordHash(BCrypt.hashpw(newPassword, BCrypt.gensalt()));
+                    userRepository.save(user);
+                    return true;
+                })
+                .orElse(false);
+    }
+
     private boolean isUsablePassword(String password) {
         return password != null && !password.trim().isEmpty()
                 && password.getBytes(StandardCharsets.UTF_8).length <= 72;
     }
 
-    public boolean deleteUser(Long id) {
+    public boolean deleteUser(Long id, String requestingUsername) {
+        if (!"admin".equals(requestingUsername)) {
+            return false;
+        }
         Optional<User> user = userRepository.findById(id);
         if (user.isPresent() && !"admin".equals(user.get().getUsername())) {
             userRepository.deleteById(id);

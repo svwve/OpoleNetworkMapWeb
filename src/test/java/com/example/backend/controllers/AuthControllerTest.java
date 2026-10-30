@@ -81,4 +81,18 @@ class AuthControllerTest {
 
         verify(userService).registerUser("new-user", "strong-password", Role.USER);
     }
+
+    @Test
+    void changesPasswordForTheAuthenticatedSessionUser() {
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttribute("username")).thenReturn("operator");
+        when(userService.changePassword("operator", "current-password", "new-password")).thenReturn(true);
+
+        var response = controller.changePassword(
+                new ChangePasswordRequest("current-password", "new-password"), session);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(Boolean.TRUE, response.getBody().get("success"));
+        verify(userService).changePassword("operator", "current-password", "new-password");
+    }
 }

@@ -24,7 +24,7 @@ public class ApiSessionInterceptor implements HandlerInterceptor {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         boolean apiRequest = path.startsWith("/api/");
         boolean protectedPage = "/map.html".equals(path) || "/projects.html".equals(path)
-                || "/admin.html".equals(path);
+                || "/admin.html".equals(path) || "/settings.html".equals(path);
         if (!apiRequest && !protectedPage) {
             return true;
         }
@@ -60,6 +60,8 @@ public class ApiSessionInterceptor implements HandlerInterceptor {
         }
 
         boolean logout = "POST".equals(request.getMethod()) && "/api/auth/logout".equals(path);
+        boolean changeOwnPassword = "POST".equals(request.getMethod())
+                && "/api/auth/change-password".equals(path);
         boolean admin = "ADMIN".equals(session.getAttribute("role"));
         if ("/admin.html".equals(path) && !admin) {
             response.sendRedirect(request.getContextPath() + "/projects.html");
@@ -79,7 +81,8 @@ public class ApiSessionInterceptor implements HandlerInterceptor {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Dostęp do zarządzania użytkownikami wymaga uprawnień administratora.");
             return false;
         }
-        if (isMutation(request.getMethod()) && !logout && !initializeProject && !admin) {
+        if (isMutation(request.getMethod()) && !logout && !changeOwnPassword
+                && !initializeProject && !admin) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Ta operacja wymaga uprawnień administratora.");
             return false;
         }

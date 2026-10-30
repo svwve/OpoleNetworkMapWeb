@@ -80,4 +80,50 @@ class UserServiceTest {
         assertTrue(userService.changeApprovedUserRole(1L, Role.USER).isEmpty());
         verify(userRepository, never()).save(admin);
     }
+
+    @Test
+    void changesPasswordOnlyAfterVerifyingCurrentPassword() {
+        UserService userService = new UserService(userRepository);
+        String oldHash = org.mindrot.jbcrypt.BCrypt.hashpw("current-password", org.mindrot.jbcrypt.BCrypt.gensalt());
+        User user = new User("operator", oldHash, Role.OPERATOR, true);
+        when(userRepository.findByUsername("operator")).thenReturn(java.util.Optional.of(user));
+
+        assertTrue(userService.changePassword("operator", "current-password", "new-password"));
+        assertTrue(org.mindrot.jbcrypt.BCrypt.checkpw("new-password", user.getPasswordHash()));
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void refusesPasswordChangeWhenCurrentPasswordDoesNotMatch() {
+        UserService userService = new UserService(userRepository);
+        User user = new User("operator", org.mindrot.jbcrypt.BCrypt.hashpw(
+                "current-password", org.mindrot.jbcrypt.BCrypt.gensalt()), Role.OPERATOR, true);
+        when(userRepository.findByUsername("operator")).thenReturn(java.util.Optional.of(user));
+
+        assertFalse(userService.changePassword("operator", "wrong-password", "new-password"));
+        verify(userRepository, never()).save(user);
+    }
+
+    @Test
+    void onlyMainAdminCanDeleteNonAdminAccounts() {
+        UserService userService = new UserService(userRepository);
+        User user = new User("operator", "hash", Role.OPERATOR, true);
+        when(userRepository.findById(2L)).thenReturn(java.util.Optional.of(user));
+
+        assertFalse(userService.deleteUser(2L, "other-admin"));
+        verify(userRepository, never()).deleteById(2L);
+
+        assertTrue(userService.deleteUser(2L, "admin"));
+        verify(userRepository).deleteById(2L);
+    }
+
+    @Test
+    void mainAdminAccountCannotBeDeleted() {
+        UserService userService = new UserService(userRepository);
+        User admin = new User("admin", "hash", Role.ADMIN, true);
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(admin));
+
+        assertFalse(userService.deleteUser(1L, "admin"));
+        verify(userRepository, never()).deleteById(1L);
+    }
 }

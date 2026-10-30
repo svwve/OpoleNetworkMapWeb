@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(async res => ({ ok: res.ok, data: await res.json() }))
             .then(({ ok, data }) => {
                 if (ok && data.success) {
-                    toggleAuthForms();
+                    setAuthView('login');
                     showSuccess(data.message || 'Konto oczekuje na zatwierdzenie administratora.');
                 } else {
                     showError(data.message || 'Błąd rejestracji');
@@ -85,8 +85,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const showRegisterBtn = document.getElementById('show-register');
     const showLoginBtn    = document.getElementById('show-login');
     if (showRegisterBtn && showLoginBtn) {
-        showRegisterBtn.addEventListener('click', e => { e.preventDefault(); toggleAuthForms(); });
-        showLoginBtn.addEventListener('click',    e => { e.preventDefault(); toggleAuthForms(); });
+        showRegisterBtn.addEventListener('click', e => {
+            e.preventDefault();
+            setAuthView('register');
+        });
+        showLoginBtn.addEventListener('click', e => {
+            e.preventDefault();
+            setAuthView('login');
+        });
+    }
+
+    const changePasswordForm = document.getElementById('change-password-form');
+    if (changePasswordForm) {
+        changePasswordForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            const error = document.getElementById('password-change-error');
+            const success = document.getElementById('password-change-success');
+            error.classList.add('hidden');
+            success.classList.add('hidden');
+
+            try {
+                const response = await apiFetch('/api/auth/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        currentPassword: document.getElementById('current-password').value,
+                        newPassword: document.getElementById('new-password').value
+                    })
+                });
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || `Nie udało się zmienić hasła (HTTP ${response.status}).`);
+                }
+                changePasswordForm.reset();
+                success.textContent = result.message;
+                success.classList.remove('hidden');
+            } catch (exception) {
+                error.textContent = exception.message || 'Nie udało się zmienić hasła.';
+                error.classList.remove('hidden');
+            }
+        });
     }
 
     // ── Wylogowanie ───────────────────────────────────────────────────────────
@@ -194,14 +232,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function toggleAuthForms() {
+function setAuthView(view) {
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
-    const showRegistration = loginForm.classList.contains('hidden');
-    loginForm.classList.toggle('hidden', !showRegistration);
-    registerForm.classList.toggle('hidden', showRegistration);
+    const showRegistration = view === 'register';
+    loginForm.classList.toggle('hidden', showRegistration);
+    registerForm.classList.toggle('hidden', !showRegistration);
     document.getElementById('login-switch').classList.toggle('hidden', showRegistration);
     document.getElementById('register-switch').classList.toggle('hidden', !showRegistration);
+    if (!showRegistration) {
+        loginForm.reset();
+        registerForm.reset();
+    }
     document.getElementById('error-message').classList.add('hidden');
     document.getElementById('success-message').classList.add('hidden');
 }

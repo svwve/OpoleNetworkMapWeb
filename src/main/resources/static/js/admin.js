@@ -2,6 +2,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     const container = document.getElementById('pending-users');
     const activeContainer = document.getElementById('active-users');
     const error = document.getElementById('admin-error');
+    let isMainAdmin = false;
+
+    function addDeleteControl(card, user) {
+        if (!isMainAdmin) return;
+
+        const deleteUser = document.createElement('button');
+        deleteUser.className = 'btn-danger-modal';
+        deleteUser.textContent = 'Usuń konto';
+        deleteUser.disabled = user.username === 'admin';
+        if (deleteUser.disabled) {
+            deleteUser.title = 'Główne konto administratora nie może zostać usunięte.';
+        }
+        deleteUser.addEventListener('click', async () => {
+            if (!window.confirm(`Czy na pewno chcesz usunąć konto „${user.username}”?`)) {
+                return;
+            }
+            deleteUser.disabled = true;
+            try {
+                const deletion = await apiFetch(`/api/admin/users/${encodeURIComponent(user.id)}`, {
+                    method: 'DELETE'
+                });
+                if (!deletion.ok) {
+                    const result = await deletion.json().catch(() => ({}));
+                    throw new Error(result.error || `Nie udało się usunąć konta (HTTP ${deletion.status}).`);
+                }
+                await Promise.all([loadPendingUsers(), loadActiveUsers()]);
+            } catch (exception) {
+                error.textContent = exception.message;
+                error.classList.remove('hidden');
+                deleteUser.disabled = false;
+            }
+        });
+        card.appendChild(deleteUser);
+    }
 
     async function loadPendingUsers() {
         error.classList.add('hidden');
@@ -49,6 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
             card.append(username, requestedRole, approve);
+            addDeleteControl(card, user);
             container.appendChild(card);
         });
     }
@@ -111,6 +146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             roleEditor.append(select, saveRole);
             card.append(username, roleEditor);
+            addDeleteControl(card, user);
             activeContainer.appendChild(card);
         });
     }
@@ -122,6 +158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.location.replace(session.success ? 'map.html' : 'index.html');
             return;
         }
+        isMainAdmin = session.username === 'admin';
         await loadPendingUsers();
         await loadActiveUsers();
     } catch (exception) {
